@@ -426,7 +426,7 @@
                     <label for="heaterRangeMXC" style="width: 120px"
                       >Heater Range:</label
                     >
-                    <select
+                    <
                       id="heaterRangeMXC"
                       class="control-input"
                       style="width: 120px"
@@ -437,6 +437,9 @@
                       <option value="3">316 µA</option>
                       <option value="4">1 mA</option>
                       <option value="5">3.16 mA</option>
+                      <option value="6">10.0 mA</option>
+                      <option value="7">31.6 mA</option>
+                      <option value="8">100 mA</option>
                     </select>
                   </div>
 
@@ -712,7 +715,11 @@
                 />
               </div>
               <div class="control-row">
-                <button onclick="toggleChannel50K()">On/Off</button>
+                <label>Channel 50K</label>
+                <label class="switch">
+                  <input type="checkbox" id="toggle50K" onclick="toggleChannel50K()" />
+                  <span class="slider"></span>
+                </label>
               </div>
             </div>
           </div>
@@ -1984,6 +1991,31 @@
 
       // Fetch data every 1 seconds
       setInterval(fetchSensorData, 1000);
+
+      async function toggleChannel50K() {
+        const checkbox = document.getElementById("toggle50K");
+        const value = checkbox.checked ? 1 : 0;
+
+        const command = `set_channel_50k:${value}`;
+
+        try {
+          addLogEntry(`Sending 50K command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+
+          console.log(
+            `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`
+          );
+          console.log(response);
+        } catch (error) {
+          checkbox.checked = !checkbox.checked;
+          addLogEntry(
+            `Error sending set_channel_50k: ${error.message}`,
+            "received"
+          );
+          console.error(error);
+        }
+      }
 
       async function toggleChannelMXC() {
         const checkbox = document.getElementById("toggleMXC");

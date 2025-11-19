@@ -499,6 +499,47 @@ def handle_command(command):
             time.sleep(1.0) 
             return message
 
+    elif command.startswith("set_channel_50k"):
+        try:
+            channel_status = int(command.split(":")[-1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel = 1))
+
+            time.sleep(0.5)  # Small delay to ensure communication channel is ready
+            if current_status == channel_status:
+                message = f"❌ 50k sensor is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for index in range(attempts):
+                if bool(channel_status): 
+                    with heater_mutex:
+                        success = ls.set_channel_on(1)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(1)
+                            
+                time.sleep(0.5) 
+                if success: break
+
+            if success:
+                message = f"✅ 50k sensor is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set 50k sensor {'On' if bool(channel_status) else 'Off'}"
+                
+            time.sleep(1.0) 
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting 50k sensor status: {e}"
+            print(message)
+            time.sleep(1.0) 
+            return message
+
     elif command.startswith("set_sensor_mode_mxc"):
         
         try:
