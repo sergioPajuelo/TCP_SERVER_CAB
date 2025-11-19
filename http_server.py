@@ -55,7 +55,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('/home/SuperTech/shared/index.html', 'rb') as file:   
+            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:   
                 self.wfile.write(file.read())
 
         elif self.path == '/get-data':
