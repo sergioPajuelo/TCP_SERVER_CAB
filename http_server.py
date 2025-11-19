@@ -5,8 +5,8 @@ import threading
 import time
 
 # Configuration for the TCP socket server
-TCP_HOST = '127.0.0.1'  # Replace with the Raspberry Pi's IP address
-TCP_PORT =65432 
+TCP_HOST = '192.168.38.3'  # Replace with the Raspberry Pi's IP address
+TCP_PORT = 65432 
 
 # Global variables to store the latest temperature data
 current_50K = None
