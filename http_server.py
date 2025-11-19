@@ -1,0 +1,581 @@
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+import socket
+import threading
+import time
+
+# Configuration for the TCP socket server
+TCP_HOST = '127.0.0.1'  # Replace with the Raspberry Pi's IP address
+TCP_PORT =65432 
+
+# Global variables to store the latest temperature data
+current_50K = None
+current_4K = None
+current_STILL = None
+current_MXC = None
+current_mxc_temperature_setpoint = None
+current_mxc_proportional_gain = None
+current_mxc_integral_gain = None
+current_mxc_derivative_gain = None
+current_mxc_heater_range = None
+current_dwell_MXC = None
+current_pause_MXC = None
+current_excitation_mode_MXC = None
+current_excitation_range_MXC = None
+current_excitation_autorange_MXC = None
+current_dwell_50K = None
+current_dwell_4K = None
+current_dwell_STILL = None
+current_pause_50K = None
+current_pause_4K = None
+current_pause_STILL = None
+current_temperature_setpoint = None
+current_heater_power = None
+current_heater_range = None
+current_temperature_limit = None
+current_timeout = None
+current_proportional_gain = None
+current_integral_gain = None
+current_derivative_gain = None
+current_R50K = None
+current_R4K = None
+current_RSTILL = None
+current_RMXC = None
+current_P50K = None
+current_P4K = None
+current_PSTILL = None
+current_PMXC = None
+current_enabled_MXC = None
+
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+
+        if self.path == '/':
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            with open('C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html', 'rb') as file:   #/home/SuperTech/shared/index.html el real
+                self.wfile.write(file.read())
+
+        elif self.path == '/get-data':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            response = json.dumps({"50K": current_50K,
+                                   "4K": current_4K,
+                                   "STILL": current_STILL,
+                                   "MXC": current_MXC,
+                                   "MXCSP": current_mxc_temperature_setpoint,
+                                   "MXCP": current_mxc_proportional_gain,
+                                   "MXCI": current_mxc_integral_gain,
+                                   "MXCD": current_mxc_derivative_gain,
+                                   "MXCHR": current_mxc_heater_range,
+                                   "dwellMXC": current_dwell_MXC,
+                                   "pauseMXC": current_pause_MXC,
+                                   "modeMXC": current_excitation_mode_MXC,
+                                   "rangeMXC": current_excitation_range_MXC,
+                                   "autorangeMXC": current_excitation_autorange_MXC,
+                                   "dwell50K": current_dwell_50K,
+                                   "dwell4K": current_dwell_4K,
+                                   "dwellSTILL": current_dwell_STILL,
+                                   "pause50K": current_pause_50K,
+                                   "pause4K": current_pause_4K,
+                                   "pauseSTILL": current_pause_STILL,
+                                   "setpoint": current_temperature_setpoint,
+                                   "heater_power": current_heater_power,
+                                   "heater_range": current_heater_range,
+                                   "temperature_limit": current_temperature_limit,
+                                   "timeout": current_timeout,
+                                   "proportional_gain": current_proportional_gain,
+                                   "integral_gain": current_integral_gain,
+                                   "derivative_gain": current_derivative_gain,
+                                   "R50K": current_R50K,
+                                   "R4K": current_R4K,
+                                   "RSTILL": current_RSTILL,
+                                   "RMXC": current_RMXC,
+                                   "PMXC": current_PMXC,
+                                   "enabledMXC": current_enabled_MXC
+                                   })
+                                   
+            self.wfile.write(response.encode('utf-8'))
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        if self.path == '/send-command':
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            command = data.get('command')
+            print(command)
+            # Forward the command to the TCP socket server
+            response = self.send_command_to_tcp_server(command)
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": response}).encode('utf-8'))
+        else:
+            self.send_error(404)
+
+    def send_command_to_tcp_server(self, command):
+        """
+        This function creates a new TCP socket called command_socket to send
+        the commands to the TCP server. In this way, the continuous sensor
+        data transmission from the TCP server to the HTTP server is not interrupted.
+        Each POST /send-command request creates a short-lived socket connection
+        to send the command and receive a response.
+        """
+
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as command_socket:
+                command_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                command_socket.settimeout(10)
+                command_socket.connect((TCP_HOST, TCP_PORT))
+                command_socket.sendall(command.encode('utf-8'))
+
+                # Read exactly one line (newline-delimited by the TCP server)
+                buf = b""
+                while b"\n" not in buf:
+                    chunk = command_socket.recv(4096)
+                    if not chunk:
+                        break
+                    buf += chunk
+                response = buf.decode('utf-8', errors='ignore').strip()
+
+            return response or "Error: empty reply from TCP server"
+        except Exception as e:
+            print(f"Error sending command to TCP server: {e}")
+            return f"Error: {str(e)}"
+
+def connect_to_tcp_server():
+    # Connect to the TCP server
+    global tcp_socket
+    try:
+        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) 
+        tcp_socket.settimeout(20)
+        print(f"Connecting to TCP server at {TCP_HOST}:{TCP_PORT}...")
+        tcp_socket.connect((TCP_HOST, TCP_PORT))
+        # Identify as sensor data subscriber
+        tcp_socket.sendall(b'SUB\n')
+        print(f"Connected to TCP server.")
+        return tcp_socket
+    except Exception as e:
+        print(f"Error connecting to TCP server: {e}")
+        time.sleep(5)
+        return None
+    
+def receive_sensor_data(tcp_socket):
+
+    # Continuously receive temperature data from the TCP server
+    # Example response: 
+    # "temperature:20,setpoint:0.0,heater_power:0.5,heater_range:LOW,temperature_setpoint:10, timeout:300,
+    # proportional_gain:1.0,integral_gain:0.1,derivative_gain:0.01"
+
+    global current_50K
+    global current_4K
+    global current_STILL
+    global current_MXC
+    
+    global current_R50K
+    global current_R4K
+    global current_RSTILL
+    global current_RMXC
+    
+    global current_P50K
+    global current_P4K
+    global current_PSTILL
+    global current_PMXC
+    
+    global current_enabled_MXC
+    
+    global current_mxc_temperature_setpoint
+    global current_mxc_proportional_gain
+    global current_mxc_integral_gain
+    global current_mxc_derivative_gain
+    global current_mxc_heater_range
+    global current_dwell_MXC
+    global current_pause_MXC
+    global current_excitation_mode_MXC
+    global current_excitation_range_MXC
+    global current_excitation_autorange_MXC
+    global current_dwell_50K
+    global current_dwell_4K
+    global current_dwell_STILL
+    global current_pause_50K
+    global current_pause_4K
+    global current_pause_STILL
+    global current_temperature_setpoint
+    global current_heater_power
+    global current_heater_range
+    global current_temperature_limit
+    global current_timeout
+    global current_proportional_gain
+    global current_integral_gain
+    global current_derivative_gain
+
+    buf = b""
+    while True:
+        try:
+            chunk = tcp_socket.recv(4096)  # bigger read is fine
+            if not chunk:
+                raise ConnectionError("Sensor data socket closed by server")
+            buf += chunk
+
+            # Process complete lines
+            while b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                response = line.decode('utf-8', errors='ignore')
+
+                # Parse the response to extract temperature and control parameters
+                params = response.split(',')
+
+                try:
+                    current_50K, current_4K, current_STILL, current_MXC = _organize_temperature_data(params[0:4])
+                except Exception as e:
+                    print(f"Error parsing temperature data: {e}")
+                    continue
+
+                try:
+                    control_params = _organize_control_params(params[4:9])
+                    current_mxc_temperature_setpoint = control_params[0]
+                    current_mxc_proportional_gain = control_params[1]
+                    current_mxc_integral_gain = control_params[2]
+                    current_mxc_derivative_gain = control_params[3]
+                    current_mxc_heater_range = control_params[4]
+                except Exception as e:
+                    print(f"Error parsing MXC control data: {e}")
+                    continue
+
+                try:
+                    resistance_settings = _organize_mxc_params(params[9:14])
+                    current_dwell_MXC = resistance_settings[0]
+                    current_pause_MXC = resistance_settings[1]
+                    current_excitation_mode_MXC = resistance_settings[2]
+                    current_excitation_range_MXC = resistance_settings[3]
+                    current_excitation_autorange_MXC = resistance_settings[4]
+                except Exception as e:
+                    print(f"Error parsing MXC parameters: {e}")
+                    continue
+
+                try:
+                    still_params = _organize_still_params(params[14:16])
+                    current_dwell_STILL = still_params[0]
+                    current_pause_STILL = still_params[1]
+                except Exception as e:
+                    print(f"Error parsing STILL parameters: {e}")
+                    continue
+
+                try:
+                    fourK_params = _organize_4k_params(params[16:18])
+                    current_dwell_4K = fourK_params[0]
+                    current_pause_4K = fourK_params[1]
+                except Exception as e:
+                    print(f"Error parsing 4K parameters: {e}")
+                    continue
+
+                try:
+                    fiftyK_params = _organize_50k_params(params[18:20])
+                    current_dwell_50K = fiftyK_params[0]
+                    current_pause_50K = fiftyK_params[1]
+                except Exception as e:
+                    print(f"Error parsing 50K parameters: {e}")
+                    continue                    
+
+                try:
+                    current_temperature_setpoint = float(params[20].split(':')[-1])
+                    current_heater_power = float(params[21].split(':')[-1])
+                    current_heater_range = params[22].split(':')[-1]
+                    current_temperature_limit = float(params[23].split(':')[-1])
+                    current_timeout = float(params[24].split(':')[-1])
+                    current_proportional_gain = float(params[25].split(':')[-1])
+                    current_integral_gain = float(params[26].split(':')[-1])
+                    current_derivative_gain = float(params[27].split(':')[-1])
+                except Exception as e:
+                    print(f"Error parsing control parameters: {e}")
+                    continue
+                
+                try:
+                    current_R50K, current_R4K, current_RSTILL, current_RMXC = _organize_resistance_data(params[29:33])
+                except Exception as e:
+                    print(f"Error parsing resistance data: {e}")
+                    continue
+                
+                try:
+                    current_P50K, current_P4K, current_PSTILL, current_PMXC = _organize_power_data(params[33:37])
+                except Exception as e:
+                    print(f"Error parsing power data: {e}")
+                    continue
+                
+                try:
+                    current_enabled_MXC = int(params[37].split(':')[-1])
+                except Exception as e:
+                    print(f"Error parsing enabled MXC variable: {e}")
+
+
+        except Exception as e:
+            print(f"Error receiving LakeShore370 data: {e}")
+            try:
+                tcp_socket = connect_to_tcp_server()
+                buf = b""  # reset buffer on reconnect
+            except Exception as e:
+                print(f"Error reconnecting to TCP server: {e}")
+                time.sleep(5)
+                break
+
+def run(server_class=HTTPServer, handler_class=SimpleHTTPRequestHandler,
+        tcp_socket=None, port=8080):
+    
+    if tcp_socket is None: tcp_socket = connect_to_tcp_server()
+    
+    server_address = ('', port)
+    httpd = server_class(server_address, handler_class)
+    print(f"HTTP server running on port {port}")
+
+    # Start the temperature data receiver thread
+    temperature_thread = threading.Thread(target=receive_sensor_data,
+                         daemon=True, args=(tcp_socket,))
+    temperature_thread.start()
+
+    # Start the HTTP server
+    httpd.serve_forever()
+
+# ---- Helper functions ----
+def _organize_temperature_data(params):
+
+    current_50K = params[0].split(':')[-1].strip()
+    if current_50K == "OFF":
+        current_50K = None
+    else:
+        try:
+            current_50K = float(current_50K)
+        except ValueError:
+            current_50K = None
+            print("Invalid 50K temperature value received:", params[0])
+
+    current_4K = params[1].split(':')[-1].strip()
+    if current_4K == "OFF":
+        current_4K = None
+    else:
+        try:
+            current_4K = float(current_4K)
+        except ValueError:
+            current_4K = None
+            print("Invalid 4K temperature value received:", params[1])
+
+    current_STILL = params[2].split(':')[-1].strip()
+    if current_STILL == "OFF":
+        current_STILL = None
+    else:              
+        try:
+            current_STILL = float(current_STILL)
+        except ValueError:
+            current_STILL = None
+            print("Invalid STILL temperature value received:", params[2])
+
+    current_MXC = params[3].split(':')[-1].strip()
+    if current_MXC == "OFF":
+        current_MXC = None
+    else:
+        try:
+            current_MXC = float(current_MXC)
+        except ValueError:
+            current_MXC = None
+            print("Invalid MXC temperature value received:", params[3])
+
+    return current_50K, current_4K, current_STILL, current_MXC
+
+def _organize_resistance_data(params):
+    
+    current_R50K = params[0].split(':')[-1].strip()
+    if current_R50K == "OFF":
+        current_R50K = None
+    else:
+        try:
+            current_R50K = float(current_R50K)
+        except ValueError:
+            current_R50K = None
+            print("Invalid 50K resistance value received:", params[0])
+
+    current_R4K = params[1].split(':')[-1].strip()
+    if current_R4K == "OFF":
+        current_R4K = None
+    else:
+        try:
+            current_R4K = float(current_R4K)
+        except ValueError:
+            current_R4K = None
+            print("Invalid 4K resistance value received:", params[1])
+
+    current_RSTILL = params[2].split(':')[-1].strip()
+    if current_RSTILL == "OFF":
+        current_RSTILL = None
+    else:              
+        try:
+            current_RSTILL = float(current_RSTILL)
+        except ValueError:
+            current_RSTILL = None
+            print("Invalid STILL resistance value received:", params[2])
+
+    current_RMXC = params[3].split(':')[-1].strip()
+    if current_RMXC == "OFF":
+        current_RMXC = None
+    else:
+        try:
+            current_RMXC = float(current_RMXC)
+        except ValueError:
+            current_RMXC = None
+            print("Invalid MXC resistance value received:", params[3])
+
+    return current_R50K, current_R4K, current_RSTILL, current_RMXC
+
+def _organize_power_data(params):
+    
+    current_P50K = params[0].split(':')[-1].strip()
+    if current_P50K == "OFF":
+        current_P50K = None
+    else:
+        try:
+            current_P50K = float(current_P50K)
+        except ValueError:
+            current_P50K = None
+            print("Invalid 50K power value received:", params[0])
+
+    current_P4K = params[1].split(':')[-1].strip()
+    if current_P4K == "OFF":
+        current_P4K = None
+    else:
+        try:
+            current_P4K = float(current_P4K)
+        except ValueError:
+            current_P4K = None
+            print("Invalid 4K power value received:", params[1])
+
+    current_PSTILL = params[2].split(':')[-1].strip()
+    if current_PSTILL == "OFF":
+        current_PSTILL = None
+    else:              
+        try:
+            current_PSTILL = float(current_PSTILL)
+        except ValueError:
+            current_PSTILL = None
+            print("Invalid STILL power value received:", params[2])
+
+    current_PMXC = params[3].split(':')[-1].strip()
+    if current_PMXC == "OFF":
+        current_PMXC = None
+    else:
+        try:
+            current_PMXC = float(current_PMXC)
+        except ValueError:
+            current_PMXC = None
+            print("Invalid MXC resistance value received:", params[3])
+
+    return current_P50K, current_P4K, current_PSTILL, current_PMXC
+
+def _organize_control_params(params):
+
+    try:
+        tempSetPointMXC = float(params[0].split(':')[-1].strip()) * 1000 # Convert to mK
+    except ValueError:
+        tempSetPointMXC = None
+        print("Invalid MXC temperature setpoint value received:", params[0])
+
+    try:
+        proportionalMXC = float(params[1].split(':')[-1].strip())
+    except ValueError:
+        proportionalMXC = None
+        print("Invalid proportional gain value received:", params[1])
+
+    try:
+        integralMXC = float(params[2].split(':')[-1].strip())
+    except ValueError:
+        integralMXC = None
+        print("Invalid integral gain value received:", params[2])
+
+    try:
+        derivativeMXC = float(params[3].split(':')[-1].strip())
+    except ValueError:
+        derivativeMXC = None
+        print("Invalid derivative gain value received:", params[3])
+    
+    try:
+        heaterRangeMXC = params[4].split(':')[-1].strip()
+    except ValueError:
+        heaterRangeMXC = None
+        print("Invalid heater range value received:", params[4])
+
+    return tempSetPointMXC, proportionalMXC, integralMXC, derivativeMXC, heaterRangeMXC
+
+def _organize_mxc_params(params):
+    
+    try:
+        dwell_MXC = float(params[0].split(':')[-1].strip())
+    except ValueError:
+        dwell_MXC = None
+        print("Invalid MXC dwell time value received:", params[0])
+
+    try:
+        pause_MXC = float(params[1].split(':')[-1].strip())
+    except ValueError:
+        pause_MXC = None
+        print("Invalid MXC pause time value received:", params[1])
+
+    excitation_mode_MXC = params[2].split(':')[-1].strip()
+    excitation_range_MXC = params[3].split(':')[-1].strip()
+    excitation_autorange_MXC = params[4].split(':')[-1].strip()
+
+    return dwell_MXC, pause_MXC, excitation_mode_MXC, excitation_range_MXC, excitation_autorange_MXC
+
+def _organize_still_params(params):
+    try:
+        dwell_STILL = float(params[0].split(':')[-1].strip())
+    except ValueError:
+        dwell_STILL = None
+        print("Invalid STILL dwell time value received:", params[0])
+
+    try:
+        pause_STILL = float(params[1].split(':')[-1].strip())
+    except ValueError:
+        pause_STILL = None
+        print("Invalid STILL pause time value received:", params[1])
+
+    return dwell_STILL, pause_STILL
+
+def _organize_4k_params(params):
+    try:
+        dwell_4K = float(params[0].split(':')[-1].strip())
+    except ValueError:
+        dwell_4K = None
+        print("Invalid 4K dwell time value received:", params[0])
+
+    try:
+        pause_4K = float(params[1].split(':')[-1].strip())
+    except ValueError:
+        pause_4K = None
+        print("Invalid 4K pause time value received:", params[1])
+
+    return dwell_4K, pause_4K
+
+def _organize_50k_params(params):
+    try:
+        dwell_50K = float(params[0].split(':')[-1].strip())
+    except ValueError:
+        dwell_50K = None
+        print("Invalid 50K dwell time value received:", params[0])
+
+    try:
+        pause_50K = float(params[1].split(':')[-1].strip())
+    except ValueError:
+        pause_50K = None
+        print("Invalid 50K pause time value received:", params[1])
+
+    return dwell_50K, pause_50K
+
+if __name__ == "__main__":
+    # Connect to the TCP server
+    tcp_socket = connect_to_tcp_server()
+    time.sleep(1)
+    if tcp_socket:
+        run(tcp_socket=tcp_socket)

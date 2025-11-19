@@ -1,0 +1,2351 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SCLab Temperature Controller</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f5f5f5;
+      }
+      .tab-menu {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .tab-button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .tab-button.active {
+        background-color: #0056b3;
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+      .container {
+        display: flex;
+        max-width: 1400px;
+        margin: 0 auto;
+        gap: 20px;
+      }
+
+      /* Switch styles */
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+        margin-left: 10px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: 0s;
+        border-radius: 24px;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+      }
+
+      input:checked + .slider {
+        background-color: #007bff;
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+
+      /* End switch styles */
+
+      .lakeshore-container {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+      .row-container {
+        display: flex;
+        flex-direction: row;
+        gap: 20px;
+        margin-bottom: 40px;
+        align-items: flex-start;
+      }
+      .lakeshore-plot-panel {
+        flex: 3;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        max-height: 200px;
+      }
+      .lakeshore-control-panel {
+        flex: 1;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 250px;
+      }
+      .blackbody-plot-panel {
+        flex: 2;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        height: 400px;
+      }
+      .blackbody-control-panel {
+        flex: 1;
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        min-width: 200px;
+      }
+      h1 {
+        margin-top: 0;
+        color: #333;
+      }
+      .control-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+      }
+      .control-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      label {
+        font-weight: bold;
+        width: 120px;
+        margin-right: 10px;
+      }
+      .current-value {
+        margin: 0 10px;
+        font-weight: bold;
+        color: #007bff;
+        width: 60px;
+        text-align: right;
+      }
+      .control-input {
+        padding: 8px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        width: 100px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-top: 10px;
+        width: 100%;
+      }
+
+      .inline-button {
+        width: auto;
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+      .log-box {
+        width: 94%;
+        height: 150px;
+        margin-top: 20px;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+        overflow-y: auto;
+      }
+      .log-entry {
+        margin-bottom: 5px;
+        padding: 3px 0;
+        border-bottom: 1px solid #eee;
+      }
+      .log-sent {
+        color: #007bff;
+      }
+      .log-received {
+        color: #28a745;
+      }
+      .log-status {
+        color: #6c757d;
+        font-weight: bold;
+      }
+
+      /* Black Body temperature chart */
+      #temperatureChartBB {
+        width: 100%;
+        max-width: 800px;
+        height: 300px;
+        display: block;
+      }
+
+      /* LakeShore stage charts */
+      #temperatureChart50K,
+      #temperatureChart4K,
+      #temperatureChartSTILL,
+      #temperatureChartMXC {
+        height: 250px;
+      }
+
+      #timeRangeMXC {
+        display: flex;
+        width: 150px;
+      }
+
+      #excitationMXC {
+        width: 170px;
+      }
+      #heaterRangeMXC {
+        width: 150px;
+      }
+
+      #dwellMXC,
+      #pauseMXC {
+        width: 100px;
+      }
+
+      select {
+        padding: 8px;
+        font-size: 14px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        margin-left: 10px;
+        width: 300px;
+      }
+
+      select option:disabled {
+        color: #ccc;
+      }
+      .section-title {
+        font-size: 18px;
+        margin: 15px 0 10px 0;
+        color: #333;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .section-title:after {
+        content: "▼";
+        font-size: 12px;
+        transition: transform 0.3s;
+      }
+      .section-title.collapsed:after {
+        transform: rotate(-90deg);
+      }
+      .section-content {
+        overflow: hidden;
+        max-height: 1000px; /* allow transition to work */
+        transition: max-height 0.3s ease-in-out;
+      }
+      .section-content.collapsed {
+        max-height: 0 !important;
+      }
+
+      .circular-checkbox {
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+        font-weight: bold;
+        margin-left: 10px;
+      }
+
+      .circular-checkbox input {
+        display: none; /* hide default checkbox */
+      }
+
+      .circular-checkbox span {
+        width: 18px;
+        height: 18px;
+        border: 2px solid #007bff; /* blue border */
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 6px;
+        background-color: transparent; /* no fill when unchecked */
+        transition: background-color 0.2s ease;
+      }
+
+      .circular-checkbox input:checked + span {
+        background-color: #007bff; /* blue fill when checked */
+      }
+
+      .current-value {
+        font-weight: bold;
+        color: #007bff; /* blue */
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="tab-menu">
+        <button class="tab-button active" data-target="lakeshore-tab">
+          Fridge Control
+        </button>
+        <button class="tab-button" data-target="blackbody-tab">
+          Black Body Control
+        </button>
+      </div>
+    </div>
+
+    <div id="lakeshore-tab" class="tab-content active">
+      <div class="container lakeshore-container">
+        <!-- Fridge Control Panel Structure
+            Fridge Tab
+            ├── System Log row (new)
+            ├── 50K Stage
+            ├── 4K Stage
+            ├── STILL Stage
+            └── MXC Stage -->
+
+        <!-- System Log for Fridge Tab -->
+        <div class="row-container">
+          <div class="lakeshore-control-panel">
+            <div class="section-title">System Log</div>
+            <div class="section-content">
+              <div class="log-box" id="logBoxLS"></div>
+            </div>
+          </div>
+        </div>
+        <!-- ------------------------- -->
+
+        <div class="section-title"><h2>MXC Stage</h2></div>
+        <div class="section-content row-container">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <!-- Temperature control -->
+              <div style="margin-top: 15px">
+                <!-- SOLO Controles del PID + Heater Range -->
+                <div id="control-settings-mxc">
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="temperatureSetpointMXC" style="width: 120px"
+                      >Setpoint (mK):</label
+                    >
+                    <input
+                      type="number"
+                      id="temperatureSetpointMXC"
+                      class="control-input"
+                      style="width: 80px"
+                      min="0"
+                      max="500"
+                      step="1"
+                    />
+                  </div>
+
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="proportionalGainMXC" style="width: 120px"
+                      >P Gain:</label
+                    >
+                    <input
+                      type="number"
+                      id="proportionalGainMXC"
+                      class="control-input"
+                      style="width: 80px"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="integralGainMXC" style="width: 120px"
+                      >I Gain:</label
+                    >
+                    <input
+                      type="number"
+                      id="integralGainMXC"
+                      class="control-input"
+                      style="width: 80px"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="derivativeGainMXC" style="width: 120px"
+                      >D Gain:</label
+                    >
+                    <input
+                      type="number"
+                      id="derivativeGainMXC"
+                      class="control-input"
+                      style="width: 80px"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div class="control-row" style="margin-bottom: 10px">
+                    <label for="heaterRangeMXC" style="width: 120px"
+                      >Heater Range:</label
+                    >
+                    <select
+                      id="heaterRangeMXC"
+                      class="control-input"
+                      style="width: 120px"
+                    >
+                      <option value="0">Off</option>
+                      <option value="1">31.6 µA</option>
+                      <option value="2">100 µA</option>
+                      <option value="3">316 µA</option>
+                      <option value="4">1 mA</option>
+                      <option value="5">3.16 mA</option>
+                    </select>
+                  </div>
+
+                  <div class="control-row" style="margin-top: 10px">
+                    <button onclick="writeControlSettingsMXC()">
+                      Write Control Settings
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Barra de progreso -->
+              <div
+                id="progressContainer"
+                style="display: none; margin-top: 10px"
+              >
+                <div style="width: 100%; background-color: #ddd">
+                  <div
+                    id="progressBar"
+                    style="width: 0%; height: 20px; background-color: #4caf50"
+                  ></div>
+                </div>
+                <div id="progressText" style="font-size: 12px; margin-top: 5px">
+                  Processing...
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            style="
+              flex: 3;
+              min-width: 750px;
+              display: flex;
+              flex-direction: column;
+            "
+          >
+            <div class="control-row" style="margin-bottom: 10px">
+              <!-- Toggle switch -->
+              <label for="toggleMXC" style="margin-right: 0px"
+                >Channel On/Off</label
+              >
+              <label class="switch" style="margin-right: 50px">
+                <input
+                  type="checkbox"
+                  id="toggleMXC"
+                  onchange="toggleChannelMXC()"
+                />
+                <span class="slider round"></span>
+              </label>
+              <!-- Time range selector for MXC Stage -->
+              <label for="timeRangeMXC" style="margin-right: 0px"
+                >Time Range:</label
+              >
+              <select
+                id="timeRangeMXC"
+                style="margin-right: 50px"
+                onchange="updateTimeRange()"
+              >
+                <option value="21600">6 Hours</option>
+                <option value="3600">1 Hour</option>
+                <option value="1800">30 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="300">5 Minutes</option>
+                <option value="60" selected>1 Minute</option>
+              </select>
+              <!-- Autorange checkbox -->
+              <label class="circular-checkbox">
+                <input
+                  type="checkbox"
+                  id="autorangeMXC"
+                  checked
+                  onchange="toggleAutorangeMXC()"
+                />
+                <span></span>
+                Autorange
+              </label>
+              <!-- Instant MXC value dropdown display -->
+              <select
+                id="currentMXCValue"
+                class="currentmxc-value"
+                style="width: 120px; margin-left: 30px"
+              >
+                <option value="temperature">- mK</option>
+                <option value="resistance">- Ω</option>
+                <option value="power">- W</option>
+              </select>
+            </div>
+            <!-- Temperature chart for MXC Stage -->
+            <div class="lakeshore-plot-panel">
+              <canvas
+                id="temperatureChartMXC"
+                width="800"
+                height="200"
+              ></canvas>
+            </div>
+
+            <!-- Thermometer parameters row -->
+            <div
+              class="control-row"
+              style="
+                margin-top: 10px;
+                display: flex;
+                gap: 15px;
+                align-items: center;
+                flex-wrap: wrap;
+              "
+            >
+              <label for="dwellMXC" style="width: 90px">Dwell Time:</label>
+              <input
+                type="number"
+                class="control-input"
+                style="width: 50px; margin-left: 2px"
+                id="dwellMXC"
+                min="0"
+                max="10"
+                step="0.1"
+              />
+
+              <label for="pauseMXC" style="width: 100px">Pause Time:</label>
+              <input
+                type="number"
+                class="control-input"
+                style="width: 50px; margin-left: 2px"
+                id="pauseMXC"
+                min="0"
+                max="10"
+                step="0.1"
+              />
+
+              <label for="sensorRangeMXC" style="width: 70px"
+                >Excitation:</label
+              >
+              <select
+                id="sensorRangeMXC"
+                class="control-input"
+                style="width: 160px"
+              >
+                <option value="1">2.00 uV and 1.00 pA</option>
+                <option value="2">6.32 uV and 3.16 pA</option>
+                <option value="3">20.0 uV and 10.0 pA</option>
+                <option value="4">63.2 uV and 31.6 pA</option>
+                <option value="5">200 uV and 100 pA</option>
+                <option value="6">632 uV and 316 pA</option>
+                <option value="7">2.00 mV and 1.00 nA</option>
+                <option value="8">6.32 mV and 3.16 nA</option>
+              </select>
+
+              <label for="sensorModeMXC" style="width: 40px">Mode:</label>
+              <select
+                id="sensorModeMXC"
+                class="control-input"
+                style="width: 90px"
+              >
+                <option value="0">Voltage</option>
+                <option value="1">Current</option>
+              </select>
+
+              <!-- Botón a la derecha de toda la fila -->
+              <button
+                class="inline-button"
+                style="margin-left: auto; padding: 8px 18px; min-width: 160px"
+                onclick="writeSensorSettingsMXC()"
+              >
+                Write Sensor Settings
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">STILL Stage</div>
+        <div class="section-content row-container">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwellSTILL">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwellSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pauseSTILL">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pauseSTILL"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <button onclick="writeSettingsSTILL()">Write Settings</button>
+              </div>
+              <div class="control-row">
+                <button onclick="toggleChannelSTILL()">On/Off</button>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <canvas
+              id="temperatureChartSTILL"
+              width="800"
+              height="200"
+            ></canvas>
+          </div>
+        </div>
+
+        <div class="section-title">4K Stage</div>
+        <div class="section-content row-container">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell4K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause4K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause4K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <button onclick="toggleChannel4K()">On/Off</button>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <canvas id="temperatureChart4K" width="800" height="200"></canvas>
+          </div>
+        </div>
+
+        <div class="section-title">50K Stage</div>
+        <div class="section-content row-container">
+          <div class="lakeshore-control-panel">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="dwell50K">Dwell Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="dwell50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="pause50K">Pause Time:</label>
+                <input
+                  type="number"
+                  class="control-input"
+                  id="pause50K"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <button onclick="toggleChannel50K()">On/Off</button>
+              </div>
+            </div>
+          </div>
+          <div class="lakeshore-plot-panel">
+            <canvas id="temperatureChart50K" width="800" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="blackbody-tab" class="tab-content">
+      <div class="container">
+        <div class="blackbody-control-panel">
+          <h1>BB Controller</h1>
+          <div class="section-title">Heater Control</div>
+          <div class="section-content">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureSetpoint">Setpoint (K):</label>
+                <span id="currentTemperatureSetpoint" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="temperatureSetpoint"
+                  class="control-input"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterPower">Power:</label>
+                <span id="currentHeaterPower" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="heaterPower"
+                  class="control-input"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="heaterRange">Range:</label>
+                <span id="currentHeaterRange" class="current-value">-</span>
+                <select id="heaterRange" class="control-input">
+                  <option value="OFF">OFF</option>
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">Safety Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="temperatureLimit">Temp Limit (K):</label>
+                <span id="currentTemperatureLimit" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="temperatureLimit"
+                  class="control-input"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+              <div class="control-row">
+                <label for="timeout">Timeout (s):</label>
+                <span id="currentTimeout" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="timeout"
+                  class="control-input"
+                  min="0"
+                  step="1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title collapsed">PID Parameters</div>
+          <div class="section-content collapsed">
+            <div class="control-group">
+              <div class="control-row">
+                <label for="proportionalGain">P Gain:</label>
+                <span id="currentProportionalGain" class="current-value"
+                  >-</span
+                >
+                <input
+                  type="number"
+                  id="proportionalGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="integralGain">I Gain:</label>
+                <span id="currentIntegralGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="integralGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <div class="control-row">
+                <label for="derivativeGain">D Gain:</label>
+                <span id="currentDerivativeGain" class="current-value">-</span>
+                <input
+                  type="number"
+                  id="derivativeGain"
+                  class="control-input"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+          </div>
+
+          <button onclick="sendControlParameters()">Update Parameters</button>
+
+          <div class="section-title">System Log</div>
+          <div class="section-content">
+            <div class="log-box" id="logBoxBB"></div>
+          </div>
+        </div>
+
+        <div class="blackbody-plot-panel">
+          <div class="time-range-selector">
+            <label for="timeRangeBB">Time Range:</label>
+            <select id="timeRangeBB" onchange="updateTimeRange()">
+              <option value="21600">6 Hours</option>
+              <option value="3600">1 Hour</option>
+              <option value="1800">30 Minutes</option>
+              <option value="900">15 Minutes</option>
+              <option value="300">5 Minutes</option>
+              <option value="60" selected>1 Minute</option>
+            </select>
+          </div>
+
+          <canvas id="temperatureChartBB"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+      // Initialize the chart
+      const ctx = document
+        .getElementById("temperatureChartBB")
+        .getContext("2d");
+      let temperatureChartBB;
+      let temperatureChart50K;
+      let temperatureChart4K;
+      let temperatureChartSTILL;
+      let temperatureChartMXC;
+      let currentTimeRangeBB = 60; // Start with 1 minute as default
+      let currentTimeRangeMXC = 60; // Start with 1 minute as default
+      let tcpConnectionStatus = null;
+      let firstDataTime = null;
+      let lastUpdateTime = null;
+      let initialParametersLoaded = false;
+      let pendingMXCToggle = false;
+
+      // Variables to store temperature data and timestamps
+      let temperatureData = [];
+      let setpointData = [];
+
+      // Variables to store relative and absolute time labels
+      let absoluteTimeLabels = [];
+      let relativeTimeLabels = [];
+      /*
+        absoluteTimeLabels stores timestamps in miliseconds
+        relativeTimeLabels stores time values in seconds relative to firstDataTime.
+        relativeTimeLabels is used for x-axis labels in charts, and it is calculated
+        as (Date.now() - firstDataTime) / 1000 
+        */
+
+      // Track parameter values
+      let currentParameters = {
+        STILL: null,
+        MXC: null,
+        MXCSP: null,
+        MXCP: null,
+        MXCI: null,
+        MXCD: null,
+        MXCHR: null,
+        dwellMXC: null,
+        pauseMXC: null,
+        modeMXC: null,
+        rangeMXC: null,
+        autorangeMXC: null,
+        temperatureSetpoint: null,
+        heaterPower: null,
+        heaterRange: null,
+        temperatureLimit: null,
+        timeout: null,
+        proportionalGain: null,
+        integralGain: null,
+        derivativeGain: null,
+        RMXC: null,
+        PMXC: null,
+      };
+
+      // Track last sent values
+      let lastSentValues = {
+        temperatureSetpoint: null,
+        heaterPower: null,
+        heaterRange: null,
+        temperatureLimit: null,
+        timeout: null,
+        proportionalGain: null,
+        integralGain: null,
+        derivativeGain: null,
+        MXCSP: null,
+        MXCP: null,
+        MXCI: null,
+        MXCD: null,
+        MXCHR: null,
+        dwellMXC: null,
+        pauseMXC: null,
+        modeMXC: null,
+        rangeMXC: null,
+        autorangeMXC: null,
+      };
+
+      // Track charts for each stage
+      const charts = {
+        "50K": null,
+        "4K": null,
+        STILL: null,
+        MXC: null,
+        BB: null,
+      };
+
+      // Store chart data for each stage
+      const chartDataStore = {
+        "50K": { labels: [], data: [] },
+        "4K": { labels: [], data: [] },
+        STILL: { labels: [], data: [] },
+        MXC: { labels: [], data: [], setpoint: [] },
+        BB: { labels: [], data: [], setpoint: [] },
+      };
+
+      // Time range options in seconds (from largest to smallest)
+      const timeRangeOptions = [
+        { value: 60, label: "1 Minute" },
+        { value: 300, label: "5 Minutes" },
+        { value: 900, label: "15 Minutes" },
+        { value: 1800, label: "30 Minutes" },
+        { value: 3600, label: "1 Hour" },
+        { value: 21600, label: "6 Hours" },
+      ];
+
+      // IDs for MXC control parameters
+      const MXC_CONTROL_IDS = [
+        "temperatureSetpointMXC",
+        "proportionalGainMXC",
+        "integralGainMXC",
+        "derivativeGainMXC",
+        "heaterRangeMXC",
+      ];
+
+      const MXC_SENSOR_IDS = [
+        "dwellMXC",
+        "pauseMXC",
+        "sensorRangeMXC",
+        "sensorModeMXC",
+      ];
+
+      // Variable to track last time parameters were updated and when to update them again
+      let lastParameterBoxUpdateTime = 0;
+      const parameterBoxUpdateInterval = 60000; // 1 minute
+
+      // Set up collapsible sections
+      function setupCollapsibleSections(context = document) {
+        const sectionTitles = context.querySelectorAll(".section-title");
+
+        sectionTitles.forEach((title) => {
+          const content = title.nextElementSibling;
+
+          // Ensure initial state matches class
+          if (title.classList.contains("collapsed")) {
+            content.classList.add("collapsed");
+            content.style.maxHeight = "0";
+          } else {
+            content.classList.remove("collapsed");
+            content.style.maxHeight = content.scrollHeight + "px";
+          }
+
+          // Prevent duplicate listeners
+          if (!title.dataset.listenerAttached) {
+            title.addEventListener("click", function () {
+              this.classList.toggle("collapsed");
+              if (this.classList.contains("collapsed")) {
+                content.classList.add("collapsed");
+                content.style.maxHeight = "0";
+              } else {
+                content.classList.remove("collapsed");
+                content.style.maxHeight = content.scrollHeight + "px";
+              }
+            });
+            title.dataset.listenerAttached = true;
+          }
+        });
+      }
+
+      // Function to update available time range options based on data duration
+      function updateTimeRangeOptions() {
+        const select = document.getElementById("timeRangeMXC");
+        const store = chartDataStore["MXC"];
+        if (!store || !store.startTime) return;
+
+        const totalElapsedSec = Math.max(
+          0,
+          (Date.now() - store.startTime) / 1000
+        );
+
+        // timeRangeOptions is ascending: [1m, 5m, 15m, 30m, 1h, 6h]
+        select.innerHTML = "";
+        for (let i = 0; i < timeRangeOptions.length; i++) {
+          const option = timeRangeOptions[i];
+          const opt = document.createElement("option");
+          opt.value = option.value;
+          opt.textContent = option.label;
+
+          // Unlock rule:
+          // - First option (1 min) always available
+          // - Option i (e.g., 5 min) becomes available when totalElapsed ≥ value of option i-1 (e.g., 1 min)
+          if (i === 0) {
+            opt.disabled = false;
+          } else {
+            const prevValue = timeRangeOptions[i - 1].value;
+            opt.disabled = totalElapsedSec < prevValue;
+          }
+
+          if (option.value === currentTimeRangeMXC) opt.selected = true;
+          select.appendChild(opt);
+        }
+
+        // If current selection got disabled, snap to largest enabled option
+        if (select.options[select.selectedIndex]?.disabled) {
+          for (let i = select.options.length - 1; i >= 0; i--) {
+            if (!select.options[i].disabled) {
+              select.selectedIndex = i;
+              currentTimeRangeMXC = parseInt(select.options[i].value, 10);
+              break;
+            }
+          }
+        }
+      }
+
+      // Function to update UI controls with current parameter values
+      function updateParameterControls() {
+        // Update input fields with server values on first load
+        if (!initialParametersLoaded) {
+          if (currentParameters.temperatureSetpoint !== null) {
+            document.getElementById("temperatureSetpoint").value =
+              currentParameters.temperatureSetpoint;
+          }
+          if (currentParameters.heaterPower !== null) {
+            document.getElementById("heaterPower").value =
+              currentParameters.heaterPower;
+          }
+          if (currentParameters.heaterRange !== null) {
+            document.getElementById("heaterRange").value =
+              currentParameters.heaterRange;
+          }
+          if (currentParameters.temperatureLimit !== null) {
+            document.getElementById("temperatureLimit").value =
+              currentParameters.temperatureLimit;
+          }
+          if (currentParameters.timeout !== null) {
+            document.getElementById("timeout").value =
+              currentParameters.timeout;
+          }
+          if (currentParameters.proportionalGain !== null) {
+            document.getElementById("proportionalGain").value =
+              currentParameters.proportionalGain;
+          }
+          if (currentParameters.integralGain !== null) {
+            document.getElementById("integralGain").value =
+              currentParameters.integralGain;
+          }
+          if (currentParameters.derivativeGain !== null) {
+            document.getElementById("derivativeGain").value =
+              currentParameters.derivativeGain;
+          }
+          if (currentParameters.MXCSP !== null) {
+            document.getElementById("temperatureSetpointMXC").value =
+              currentParameters.MXCSP;
+          }
+          if (currentParameters.MXCP !== null) {
+            document.getElementById("proportionalGainMXC").value =
+              currentParameters.MXCP;
+          }
+          if (currentParameters.MXCI !== null) {
+            document.getElementById("integralGainMXC").value =
+              currentParameters.MXCI;
+          }
+          if (currentParameters.MXCD !== null) {
+            document.getElementById("derivativeGainMXC").value =
+              currentParameters.MXCD;
+          }
+          if (currentParameters.MXCHR !== null) {
+            document.getElementById("heaterRangeMXC").value =
+              currentParameters.MXCHR;
+          }
+          if (currentParameters.dwellMXC !== null) {
+            document.getElementById("dwellMXC").value =
+              currentParameters.dwellMXC;
+          }
+          if (currentParameters.pauseMXC !== null) {
+            document.getElementById("pauseMXC").value =
+              currentParameters.pauseMXC;
+          }
+          if (currentParameters.rangeMXC !== null) {
+            document.getElementById("sensorRangeMXC").value =
+              currentParameters.rangeMXC;
+          }
+          if (currentParameters.modeMXC !== null) {
+            document.getElementById("sensorModeMXC").value =
+              currentParameters.modeMXC;
+          }
+          if (currentParameters.autorangeMXC !== null) {
+            document.getElementById("autorangeMXC").checked =
+              currentParameters.autorangeMXC;
+          }
+          initialParametersLoaded = true;
+        }
+
+        // Update current value displays
+        if (currentParameters.temperatureSetpoint !== null) {
+          document.getElementById("currentTemperatureSetpoint").textContent =
+            currentParameters.temperatureSetpoint.toFixed(1);
+        }
+        if (currentParameters.heaterPower !== null) {
+          document.getElementById("currentHeaterPower").textContent =
+            currentParameters.heaterPower.toFixed(2);
+        }
+        if (currentParameters.heaterRange !== null) {
+          document.getElementById("currentHeaterRange").textContent =
+            currentParameters.heaterRange;
+        }
+        if (currentParameters.temperatureLimit !== null) {
+          document.getElementById("currentTemperatureLimit").textContent =
+            currentParameters.temperatureLimit.toFixed(1);
+        }
+        if (currentParameters.timeout !== null) {
+          document.getElementById("currentTimeout").textContent =
+            currentParameters.timeout.toFixed(0);
+        }
+        if (currentParameters.proportionalGain !== null) {
+          document.getElementById("currentProportionalGain").textContent =
+            currentParameters.proportionalGain.toFixed(3);
+        }
+        if (currentParameters.integralGain !== null) {
+          document.getElementById("currentIntegralGain").textContent =
+            currentParameters.integralGain.toFixed(3);
+        }
+        if (currentParameters.derivativeGain !== null) {
+          document.getElementById("currentDerivativeGain").textContent =
+            currentParameters.derivativeGain.toFixed(3);
+        }
+        if (currentParameters.MXCSP !== null) {
+          document.getElementById("temperatureSetpointMXC").value =
+            currentParameters.MXCSP;
+        }
+        if (currentParameters.MXCP !== null) {
+          document.getElementById("proportionalGainMXC").value =
+            currentParameters.MXCP;
+        }
+        if (currentParameters.MXCI !== null) {
+          document.getElementById("integralGainMXC").value =
+            currentParameters.MXCI;
+        }
+        if (currentParameters.MXCD !== null) {
+          document.getElementById("derivativeGainMXC").value =
+            currentParameters.MXCD;
+        }
+        if (currentParameters.MXCHR !== null) {
+          document.getElementById("heaterRangeMXC").value =
+            currentParameters.MXCHR;
+        }
+        if (currentParameters.dwellMXC !== null) {
+          document.getElementById("dwellMXC").value =
+            currentParameters.dwellMXC;
+        }
+        if (currentParameters.pauseMXC !== null) {
+          document.getElementById("pauseMXC").value =
+            currentParameters.pauseMXC;
+        }
+        if (currentParameters.rangeMXC !== null) {
+          document.getElementById("sensorRangeMXC").value =
+            currentParameters.rangeMXC;
+        }
+        if (currentParameters.modeMXC !== null) {
+          document.getElementById("sensorModeMXC").value =
+            currentParameters.modeMXC;
+        }
+        if (currentParameters.autorangeMXC !== null) {
+          document.getElementById("autorangeMXC").checked =
+            currentParameters.autorangeMXC;
+        }
+      }
+
+      // Function to check TCP server connection status
+      async function checkConnectionStatus() {
+        try {
+          const response = await fetch("/get-data");
+          if (response.ok) {
+            return true;
+          }
+          return false;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      // Function to update connection status (only logs if status changed)
+      async function updateConnectionStatus() {
+        const newStatus = await checkConnectionStatus();
+
+        if (tcpConnectionStatus === null) {
+          // Initial status check
+          tcpConnectionStatus = newStatus;
+          if (tcpConnectionStatus) {
+            addLogEntry("HTTP server is connected to TCP server", "status");
+          } else {
+            addLogEntry("HTTP server is NOT connected to TCP server", "status");
+          }
+        } else if (newStatus !== tcpConnectionStatus) {
+          // Status changed
+          tcpConnectionStatus = newStatus;
+          if (tcpConnectionStatus) {
+            addLogEntry("Reconnected to TCP server", "status");
+          } else {
+            addLogEntry("Lost connection to TCP server", "status");
+          }
+        }
+
+        return tcpConnectionStatus;
+      }
+
+      // General function to create any temperature chart (black body or lakeshore stages)
+      function createTemperatureChart(
+        canvasId,
+        includesetpoint = false,
+        label = "Temperature (K)"
+      ) {
+        // Create a new chart instance
+        const ctx = document.getElementById(canvasId).getContext("2d");
+
+        const datasets = [
+          {
+            label: label,
+            data: [],
+            borderColor: "royalblue", // 'rgba(75, 192, 192, 1)',
+            borderWidth: 1,
+            pointRadius: 0,
+            fill: includesetpoint
+              ? {
+                  target: "1", // Fill to dataset index 1 (setpoint)
+                  above: "rgba(173, 216, 230, 0.1)", // Fill color when temperature is above setpoint
+                  below: "rgba(173, 216, 230, 0.1)", // Same fill color when below
+                }
+              : false,
+          },
+        ];
+
+        if (includesetpoint) {
+          datasets.push({
+            label: "Setpoint (K)",
+            data: [],
+            borderColor: "rgba(255, 99, 132, 0.9)", // Red color
+            borderWidth: 2,
+            borderDash: [5, 5], // Dashed line
+            fill: false,
+            pointRadius: 0, // No points
+          });
+        }
+
+        // Initialize the chart with empty data
+        return new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: datasets,
+          },
+          options: {
+            animation: false,
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+              x: {
+                type: "linear",
+                title: {
+                  display: true,
+                  text: "Time (s)",
+                },
+                min: 0,
+                max: 60, // Start with 1 minute range
+                ticks: {
+                  callback: function (value) {
+                    if (currentTimeRangeMXC > 21600) {
+                      return `${(value / 3600).toFixed(1)}h`;
+                    } else if (currentTimeRangeMXC > 300) {
+                      return `${(value / 60).toFixed(1)}m`;
+                    } else {
+                      return `${value.toFixed(0)}s`;
+                    }
+                  },
+                },
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: "Temperature (K)",
+                },
+                beginAtZero: false,
+              },
+            },
+          },
+        });
+      }
+
+      // Function that allows double-clicking on the Y-axis to edit limits
+      function enableYAxisLimitEditing(chart, canvasId) {
+        const canvas = document.getElementById(canvasId);
+
+        canvas.addEventListener("dblclick", function (event) {
+          const rect = canvas.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+
+          const yAxis = chart.scales.y;
+          const yAxisLeft = yAxis.left;
+          const yAxisRight = yAxis.right;
+
+          // If click is inside the Y-axis area
+          if (x >= yAxisLeft && x <= yAxisRight) {
+            const currentMin = chart.options.scales.y.min ?? yAxis.min;
+            const currentMax = chart.options.scales.y.max ?? yAxis.max;
+
+            const newMin = prompt(
+              `Enter new Y-axis MIN (current: ${currentMin}):`,
+              currentMin
+            );
+            if (newMin === null || isNaN(parseFloat(newMin))) return;
+
+            const newMax = prompt(
+              `Enter new Y-axis MAX (current: ${currentMax}):`,
+              currentMax
+            );
+            if (newMax === null || isNaN(parseFloat(newMax))) return;
+
+            chart.options.scales.y.min = parseFloat(newMin);
+            chart.options.scales.y.max = parseFloat(newMax);
+            chart.update();
+          }
+        });
+      }
+
+      // Function to update any temperature chart with new data
+      function updateTemperatureChart(chartId, temperature, setpoint = null) {
+        const now = Date.now();
+
+        // Ensure chart and store exist
+        if (!charts[chartId]) {
+          console.warn(`⚠️ Chart ${chartId} not initialized.`);
+          return;
+        }
+        if (!chartDataStore[chartId]) {
+          console.warn(
+            `⚠️ Data store for ${chartId} not found. Initializing...`
+          );
+          chartDataStore[chartId] = {
+            labels: [],
+            data: [],
+            setpoint: [],
+            startTime: null,
+          };
+        }
+
+        const store = chartDataStore[chartId];
+
+        // Initialize startTime the first time this runs
+        if (!store.startTime) {
+          store.startTime = now;
+        }
+
+        // Time in seconds since the first data point
+        const relTime = (now - store.startTime) / 1000;
+
+        // Push new data
+        store.labels.push(relTime);
+        store.data.push(temperature);
+        if (setpoint !== null) {
+          store.setpoint.push(setpoint);
+        }
+
+        updateTimeRangeOptions();
+
+        console.log(
+          `➡ Pushed to ${chartId}: T=${temperature}, S=${setpoint}, t=${relTime.toFixed(
+            2
+          )}`
+        );
+        console.log(`✅ Store after push (${chartId}):`, store);
+
+        // Filter data based on time range
+        const displayTimeStart = Math.max(0, relTime - currentTimeRangeMXC);
+        const labelsFiltered = [];
+        const tempFiltered = [];
+        const setpointFiltered = [];
+
+        for (let i = 0; i < store.labels.length; i++) {
+          const t = store.labels[i];
+          if (t >= displayTimeStart) {
+            labelsFiltered.push(t - displayTimeStart);
+            tempFiltered.push(store.data[i]);
+            if (setpoint !== null && store.setpoint) {
+              setpointFiltered.push(store.setpoint[i]);
+            }
+          }
+        }
+
+        const chart = charts[chartId];
+        chart.data.labels = labelsFiltered;
+        chart.data.datasets[0].data = tempFiltered;
+        if (setpoint !== null && chart.data.datasets[1]) {
+          chart.data.datasets[1].data = setpointFiltered;
+        }
+
+        // Update x-axis scale
+        chart.options.scales.x.min = 0;
+        chart.options.scales.x.max = currentTimeRangeMXC;
+
+        // Optional Y-axis safety clamp
+        chart.options.scales.y.suggestedMin = 0;
+
+        chart.update("none");
+      }
+
+      // Update chart time range function
+      function updateTimeRange() {
+        const timeRangeSelect = document.getElementById("timeRangeMXC");
+        currentTimeRangeMXC = parseInt(timeRangeSelect.value, 10); // <-- use the right variable
+
+        // Re-slice from the store immediately so the axis updates now
+        redrawFromStore("MXC");
+      }
+
+      function updateMXCTemperature(value_mK) {
+        document.getElementById("currentTemperatureMXC").textContent =
+          value_mK.toFixed(4);
+      }
+
+      function updateMXCValues(temp_K, res_ohm, power_watt) {
+        const select = document.getElementById("currentMXCValue");
+
+        let tempLabel;
+
+        // Show in mK if < 1 K, else show in K
+        if (temp_K < 1.0) {
+          tempLabel = `${(temp_K * 1000).toFixed(3)} mK`;
+        } else {
+          tempLabel = `${temp_K.toFixed(3)} K`;
+        }
+
+        select.options[0].text = tempLabel;
+        select.options[1].text = `${res_ohm.toFixed(3)} Ω`;
+        select.options[2].text = `${power_watt.toExponential(2)} W`;
+      }
+
+      function redrawFromStore(chartId) {
+        const chart = charts[chartId];
+        const store = chartDataStore[chartId];
+        if (!chart || !store) return;
+
+        const now = Date.now();
+        const relTime = (now - store.startTime) / 1000;
+        const displayTimeStart = Math.max(0, relTime - currentTimeRangeMXC);
+
+        const labelsFiltered = [];
+        const tempFiltered = [];
+        const setpointFiltered = [];
+
+        for (let i = 0; i < store.labels.length; i++) {
+          const t = store.labels[i];
+          if (t >= displayTimeStart) {
+            labelsFiltered.push(t - displayTimeStart);
+            tempFiltered.push(store.data[i]);
+            if (store.setpoint) setpointFiltered.push(store.setpoint[i]);
+          }
+        }
+
+        chart.data.labels = labelsFiltered;
+        chart.data.datasets[0].data = tempFiltered;
+        if (chart.data.datasets[1]) {
+          chart.data.datasets[1].data = setpointFiltered;
+        }
+
+        chart.options.scales.x.min = 0;
+        chart.options.scales.x.max = currentTimeRangeMXC;
+        chart.update("none");
+      }
+
+      // Function to add a log entry to the log box
+      function addLogEntry(message, type) {
+        const logEntry = document.createElement("div");
+        logEntry.className = `log-entry log-${type}`;
+        logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+
+        const logBoxBB = document.getElementById("logBoxBB");
+        const logBoxLS = document.getElementById("logBoxLS");
+
+        if (logBoxBB) {
+          logBoxBB.appendChild(logEntry.cloneNode(true));
+          logBoxBB.scrollTop = logBoxBB.scrollHeight;
+        }
+
+        if (logBoxLS) {
+          logBoxLS.appendChild(logEntry.cloneNode(true));
+          logBoxLS.scrollTop = logBoxLS.scrollHeight;
+        }
+      }
+
+      // Helper function to send a command to the server
+      async function sendCommandToServer(command) {
+        const response = await fetch("/send-command", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ command }),
+        });
+
+        const result = await response.json();
+
+        // Check if we thought we were disconnected but got a response
+        if (tcpConnectionStatus === false) {
+          tcpConnectionStatus = true;
+          addLogEntry("Reconnected to TCP server", "status");
+        }
+
+        return result.status;
+      }
+
+      // Function to send only changed parameters to the server
+      async function sendControlParameters() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        // Get current values from UI
+        const currentValues = {
+          temperatureSetpoint: parseFloat(
+            document.getElementById("temperatureSetpoint").value
+          ),
+          heaterPower: parseFloat(document.getElementById("heaterPower").value),
+          heaterRange: document.getElementById("heaterRange").value,
+          temperatureLimit: parseFloat(
+            document.getElementById("temperatureLimit").value
+          ),
+          timeout: parseFloat(document.getElementById("timeout").value),
+          proportionalGain: parseFloat(
+            document.getElementById("proportionalGain").value
+          ),
+          integralGain: parseFloat(
+            document.getElementById("integralGain").value
+          ),
+          derivativeGain: parseFloat(
+            document.getElementById("derivativeGain").value
+          ),
+        };
+
+        // Validate values and check for changes
+        const commandsToSend = [];
+
+        // Check temperature setpoint
+        if (
+          !isNaN(currentValues.temperatureSetpoint) &&
+          currentValues.temperatureSetpoint !==
+            lastSentValues.temperatureSetpoint
+        ) {
+          commandsToSend.push({
+            type: "temperatureSetpoint",
+            command: `set_temperature_setpoint:${currentValues.temperatureSetpoint}`,
+          });
+        }
+
+        // Check heater power
+        if (
+          !isNaN(currentValues.heaterPower) &&
+          currentValues.heaterPower !== lastSentValues.heaterPower
+        ) {
+          if (currentValues.heaterPower < 0 || currentValues.heaterPower > 1) {
+            addLogEntry(
+              "Error: Heater power must be between 0.0 and 1.0",
+              "received"
+            );
+            return;
+          }
+          commandsToSend.push({
+            type: "heaterPower",
+            command: `set_heater_power:${currentValues.heaterPower}`,
+          });
+        }
+
+        // Check heater range
+        if (currentValues.heaterRange !== lastSentValues.heaterRange) {
+          commandsToSend.push({
+            type: "heaterRange",
+            command: `set_heater_range:${currentValues.heaterRange}`,
+          });
+        }
+
+        // Check temperature limit
+        if (
+          !isNaN(currentValues.temperatureLimit) &&
+          currentValues.temperatureLimit !== lastSentValues.temperatureLimit
+        ) {
+          if (currentValues.temperatureLimit < 0) {
+            addLogEntry(
+              "Error: Temperature limit must be non-negative",
+              "received"
+            );
+            return;
+          }
+          commandsToSend.push({
+            type: "temperatureLimit",
+            command: `set_temperature_limit:${currentValues.temperatureLimit}`,
+          });
+        }
+
+        // Check timeout
+        if (
+          !isNaN(currentValues.timeout) &&
+          currentValues.timeout !== lastSentValues.timeout
+        ) {
+          if (currentValues.timeout < 0) {
+            addLogEntry("Error: Timeout must be non-negative", "received");
+            return;
+          }
+          commandsToSend.push({
+            type: "timeout",
+            command: `set_timeout:${currentValues.timeout}`,
+          });
+        }
+
+        // Check proportional gain
+        if (
+          !isNaN(currentValues.proportionalGain) &&
+          currentValues.proportionalGain !== lastSentValues.proportionalGain
+        ) {
+          if (currentValues.proportionalGain < 0) {
+            addLogEntry(
+              "Error: Proportional gain must be non-negative",
+              "received"
+            );
+            return;
+          }
+          commandsToSend.push({
+            type: "proportionalGain",
+            command: `set_proportional_gain:${currentValues.proportionalGain}`,
+          });
+        }
+
+        // Check integral gain
+        if (
+          !isNaN(currentValues.integralGain) &&
+          currentValues.integralGain !== lastSentValues.integralGain
+        ) {
+          if (currentValues.integralGain < 0) {
+            addLogEntry(
+              "Error: Integral gain must be non-negative",
+              "received"
+            );
+            return;
+          }
+          commandsToSend.push({
+            type: "integralGain",
+            command: `set_integral_gain:${currentValues.integralGain}`,
+          });
+        }
+
+        // Check derivative gain
+        if (
+          !isNaN(currentValues.derivativeGain) &&
+          currentValues.derivativeGain !== lastSentValues.derivativeGain
+        ) {
+          if (currentValues.derivativeGain < 0) {
+            addLogEntry(
+              "Error: Derivative gain must be non-negative",
+              "received"
+            );
+            return;
+          }
+          commandsToSend.push({
+            type: "derivativeGain",
+            command: `set_derivative_gain:${currentValues.derivativeGain}`,
+          });
+        }
+
+        // If no changes detected
+        if (commandsToSend.length === 0) {
+          addLogEntry("No parameter changes detected", "status");
+          return;
+        }
+
+        // Send changed parameters
+        for (const cmd of commandsToSend) {
+          try {
+            addLogEntry(`Sending command: ${cmd.command}`, "sent");
+            const response = await sendCommandToServer(cmd.command);
+            addLogEntry(`Server response: ${response}`, "received");
+
+            // Update last sent value if successful
+            lastSentValues[cmd.type] = currentValues[cmd.type];
+          } catch (error) {
+            addLogEntry(
+              `Error sending ${cmd.type}: ${error.message}`,
+              "received"
+            );
+          }
+        }
+      }
+
+      // Function that handles fetching sensor data from the server
+      // and updates the UI accordingly
+      async function fetchSensorData() {
+        try {
+          // Fetch data from the server using the /get-data channel
+          const response = await fetch("/get-data");
+          if (!response.ok) {
+            if (tcpConnectionStatus !== false) {
+              await updateConnectionStatus();
+            }
+            return;
+          }
+
+          // From that response, parse the JSON data
+          const data = await response.json();
+          console.log("✅ Received data from server:", data);
+
+          // Update parameters if they changed
+          if (data.STILL !== undefined) {
+            currentParameters.STILL = parseFloat(data.STILL);
+          }
+          if (data.MXC !== undefined) {
+            currentParameters.MXC = parseFloat(data.MXC);
+          }
+          if (data.RMXC !== undefined) {
+            currentParameters.RMXC = parseFloat(data.RMXC);
+          }
+          if (data.PMXC !== undefined) {
+            currentParameters.PMXC = parseFloat(data.PMXC);
+          }
+          if (data.enabledMXC !== undefined) {
+            currentParameters.enabledMXC = parseInt(data.enabledMXC);
+          }
+          if (data.setpoint !== undefined) {
+            currentParameters.temperatureSetpoint = parseFloat(data.setpoint);
+          }
+          if (data.heater_power !== undefined) {
+            currentParameters.heaterPower = parseFloat(data.heater_power);
+          }
+          if (data.heater_range !== undefined) {
+            currentParameters.heaterRange = data.heater_range;
+          }
+          if (data.temperature_limit !== undefined) {
+            currentParameters.temperatureLimit = parseFloat(
+              data.temperature_limit
+            );
+          }
+          if (data.timeout !== undefined) {
+            currentParameters.timeout = parseFloat(data.timeout);
+          }
+          if (data.proportional_gain !== undefined) {
+            currentParameters.proportionalGain = parseFloat(
+              data.proportional_gain
+            );
+          }
+          if (data.integral_gain !== undefined) {
+            currentParameters.integralGain = parseFloat(data.integral_gain);
+          }
+          if (data.derivative_gain !== undefined) {
+            currentParameters.derivativeGain = parseFloat(data.derivative_gain);
+          }
+          if (data.MXCSP !== undefined) {
+            currentParameters.MXCSP = parseFloat(data.MXCSP);
+          }
+          if (data.MXCP !== undefined) {
+            currentParameters.MXCP = parseFloat(data.MXCP);
+          }
+          if (data.MXCI !== undefined) {
+            currentParameters.MXCI = parseFloat(data.MXCI);
+          }
+          if (data.MXCD !== undefined) {
+            currentParameters.MXCD = parseFloat(data.MXCD);
+          }
+          if (data.MXCHR !== undefined) {
+            currentParameters.MXCHR = parseFloat(data.MXCHR);
+          }
+          if (data.dwellMXC !== undefined) {
+            currentParameters.dwellMXC = parseFloat(data.dwellMXC);
+          }
+          if (data.pauseMXC !== undefined) {
+            currentParameters.pauseMXC = parseFloat(data.pauseMXC);
+          }
+          if (data.modeMXC !== undefined) {
+            currentParameters.modeMXC = parseInt(data.modeMXC);
+          }
+          if (data.rangeMXC !== undefined) {
+            currentParameters.rangeMXC = parseInt(data.rangeMXC);
+          }
+          if (data.autorangeMXC !== undefined) {
+            currentParameters.autorangeMXC = parseInt(data.autorangeMXC);
+          }
+
+          // Update UI controls if parameters changed every minute
+          // (or the time specified in parameterBoxUpdateInterval variable)
+          const now = Date.now();
+          if (now - lastParameterBoxUpdateTime > parameterBoxUpdateInterval) {
+            console.log("🔄 Updating parameter controls with new values");
+            lastParameterBoxUpdateTime = now;
+            updateParameterControls();
+          }
+
+          // Update last sent values to prevent unnecessary updates
+          lastSentValues = {
+            temperatureSetpoint: currentParameters.temperatureSetpoint,
+            heaterPower: currentParameters.heaterPower,
+            heaterRange: currentParameters.heaterRange,
+            temperatureLimit: currentParameters.temperatureLimit,
+            timeout: currentParameters.timeout,
+            proportionalGain: currentParameters.proportionalGain,
+            integralGain: currentParameters.integralGain,
+            derivativeGain: currentParameters.derivativeGain,
+            temperatureSetpointMXC: currentParameters.MXCSP,
+            dwellMXC: currentParameters.dwellMXC,
+            pauseMXC: currentParameters.pauseMXC,
+            modeMXC: currentParameters.modeMXC,
+            rangeMXC: currentParameters.rangeMXC,
+            autorangeMXC: currentParameters.autorangeMXC,
+          };
+
+          // Update the STILL chart with the new temperature
+          if (currentParameters.STILL !== null) {
+            console.log(
+              "📈 Updating STILL chart with:",
+              currentParameters.STILL
+            );
+
+            updateTemperatureChart("STILL", currentParameters.STILL);
+          }
+
+          // Update the MXC chart with the new temperature
+          if (currentParameters.MXC !== null) {
+            console.log(
+              "📈 Updating MXC chart with:",
+              currentParameters.MXC,
+              currentParameters.temperatureSetpoint
+            );
+
+            updateTemperatureChart(
+              "MXC",
+              currentParameters.MXC,
+              currentParameters.temperatureSetpoint
+            );
+
+            updateMXCValues(
+              currentParameters.MXC, // Temperature in mK
+              currentParameters.RMXC, // Resistance in Ohms
+              currentParameters.PMXC
+            ); // Power in Watts
+          }
+
+          const toggleMXC = document.getElementById("toggleMXC");
+          const enabledMXC = !!currentParameters.enabledMXC; // number to bool - data from controller
+          const enabledButtonMXC = toggleMXC.checked;
+
+          if (toggleMXC.checked !== enabledMXC) {
+            toggleMXC.checked = enabledMXC;
+            console.log(
+              `🔁 Sync MXC toggle -> ${
+                enabledMXC ? "ON" : "OFF"
+              } (from controller)`
+            );
+          } else {
+            if (toggleMXC.checked === enabledMXC) {
+              pendingMXCToggle = false;
+            }
+          }
+
+          if (tcpConnectionStatus === false) {
+            await updateConnectionStatus();
+          }
+        } catch (error) {
+          console.error("Error fetching data:", error);
+          if (tcpConnectionStatus !== false) {
+            await updateConnectionStatus();
+          }
+        }
+      }
+
+      // Check initial connection status when page loads
+      document.addEventListener("DOMContentLoaded", async function () {
+        // Set up collapsible sections
+        setupCollapsibleSections();
+
+        charts["BB"] = createTemperatureChart(
+          "temperatureChartBB",
+          true,
+          "Black Body Temperature (K)"
+        );
+        charts["50K"] = createTemperatureChart(
+          "temperatureChart50K",
+          false,
+          "Temperature 50K"
+        );
+        charts["4K"] = createTemperatureChart(
+          "temperatureChart4K",
+          false,
+          "Temperature 4K"
+        );
+        charts["STILL"] = createTemperatureChart(
+          "temperatureChartSTILL",
+          false,
+          "Temperature STILL"
+        );
+        charts["MXC"] = createTemperatureChart(
+          "temperatureChartMXC",
+          false,
+          "Temperature MXC"
+        );
+
+        enableYAxisLimitEditing(charts["MXC"], "temperatureChartMXC");
+        enableYAxisLimitEditing(charts["STILL"], "temperatureChartSTILL");
+
+        await updateConnectionStatus();
+
+        // Add event listeners for Enter key in all input fields
+        // Exclude MXC control and sensor IDs  from this since MXC controls have their own keypress handling
+        document.querySelectorAll(".control-input").forEach((input) => {
+          const id = input.id;
+          if (!MXC_CONTROL_IDS.includes(id) && !MXC_SENSOR_IDS.includes(id)) {
+            input.addEventListener("keypress", function (e) {
+              if (e.key === "Enter") {
+                sendControlParameters();
+              }
+            });
+          }
+        });
+
+        // Initial data fetch
+        await fetchSensorData();
+      });
+
+      // Fetch data every 1 seconds
+      setInterval(fetchSensorData, 1000);
+
+      async function toggleChannelMXC() {
+        const checkbox = document.getElementById("toggleMXC");
+        const value = checkbox.checked ? 1 : 0;
+
+        const command = `set_channel_mxc:${value}`;
+
+        try {
+          addLogEntry(`Sending MXC command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+
+          console.log(
+            `Channel MXC is now ${checkbox.checked ? "enabled" : "disabled"}`
+          );
+          console.log(response);
+        } catch (error) {
+          checkbox.checked = !checkbox.checked;
+          addLogEntry(
+            `Error sending set_channel_mxc: ${error.message}`,
+            "received"
+          );
+          console.error(error);
+        }
+      }
+
+      async function toggleAutorangeMXC() {
+        console.log("Toggling MXC autorange...");
+
+        //Comprobamos conexión TCP
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send MXC command: No connection to TCP server",
+            "status"
+          );
+          const cb = document.getElementById("autorangeMXC");
+          cb.checked = !cb.checked;
+          return;
+        }
+
+        const cb = document.getElementById("autorangeMXC");
+        const value = cb.checked ? 1 : 0; // 1 = ON, 0 = OFF
+
+        const command = `set_autorange_mxc:${value}`;
+
+        try {
+          addLogEntry(`Sending MXC autorange command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+          console.log(response);
+        } catch (error) {
+          addLogEntry(
+            `Error sending autorange MXC: ${error.message}`,
+            "received"
+          );
+          cb.checked = !cb.checked;
+          console.error(error);
+        }
+      }
+
+      async function writeSensorSettingsMXC() {
+        console.log("Writing sensor settings for MXC...");
+
+        //Check if we have a valid TCP connection
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send MXC command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const values = {
+          dwellMXC: parseFloat(document.getElementById("dwellMXC").value),
+          pauseMXC: parseFloat(document.getElementById("pauseMXC").value),
+          rangeMXC: parseInt(
+            document.getElementById("sensorRangeMXC").value,
+            10
+          ),
+          modeMXC: parseInt(document.getElementById("sensorModeMXC").value, 10),
+        };
+
+        const commands = [];
+
+        if (!isNaN(values.dwellMXC)) {
+          if (values.dwellMXC < 0 || values.dwellMXC > 10) {
+            addLogEntry(
+              "Error: Dwell time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "dwellMXC",
+            command: `set_dwell_mxc:${values.dwellMXC}`,
+          });
+        }
+
+        if (!isNaN(values.pauseMXC)) {
+          if (values.pauseMXC < 0 || values.pauseMXC > 10) {
+            addLogEntry(
+              "Error: Pause time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "pauseMXC",
+            command: `set_pause_mxc:${values.pauseMXC}`,
+          });
+        }
+
+        if (!isNaN(values.rangeMXC)) {
+          if (values.rangeMXC < 1 || values.rangeMXC > 8) {
+            addLogEntry(
+              "Error: Sensor Range (Excitation) must be between 1 and 8",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "rangeMXC",
+            command: `set_sensor_range_mxc:${values.rangeMXC}`,
+          });
+        }
+
+        if (!isNaN(values.modeMXC)) {
+          if (values.modeMXC !== 0 && values.modeMXC !== 1) {
+            addLogEntry(
+              "Error: Sensor Mode must be 0 (Voltage) or 1 (Current)",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "modeMXC",
+            command: `set_sensor_mode_mxc:${values.modeMXC}`,
+          });
+        }
+
+        if (commands.length === 0) {
+          addLogEntry(
+            "No sensor parameter changes detected or valid",
+            "status"
+          );
+          return;
+        }
+
+        const progressContainer = document.getElementById("progressContainer");
+        const progressBar = document.getElementById("progressBar");
+        const progressText = document.getElementById("progressText");
+
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "Processing sensor settings...";
+
+        for (const cmd of commands) {
+          try {
+            addLogEntry(`Sending MXC sensor command: ${cmd.command}`, "sent");
+            const response = await sendCommandToServer(cmd.command);
+            addLogEntry(`Server response: ${response}`, "received");
+            lastSentValues[cmd.type] = values[cmd.type];
+          } catch (error) {
+            addLogEntry(
+              `Error sending ${cmd.type}: ${error.message}`,
+              "received"
+            );
+          }
+          const progress =
+            ((commands.indexOf(cmd) + 1) / commands.length) * 100;
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `Processing sensor settings... ${Math.round(
+            progress
+          )}%`;
+        }
+
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
+      }
+
+      async function writeControlSettingsMXC() {
+        /*  This function is called when the "Write Control Settings" button is clicked
+                It is async since it will send commands to the server, performing asynchronous operations
+            */
+
+        console.log("Writing control settings for MXC...");
+
+        // Check if we have a valid TCP connection
+        // Log error when no connection to TCP server
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send MXC command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        async function writeExcitationMXC() {
+          console.log("Writing excitation level for MXC...");
+
+          if (tcpConnectionStatus === false) {
+            addLogEntry(
+              "Cannot send MXC command: No connection to TCP server",
+              "status"
+            );
+            return;
+          }
+
+          const value = document.getElementById("excitationMXC").value;
+
+          if (!isNaN(value)) {
+            if (value < 1 || value > 8) {
+              addLogEntry(
+                "Error: Sensor range must be between 1 and 8",
+                "received"
+              );
+              return;
+            }
+          }
+        }
+        // Get current values from UI
+        const values = {
+          MXCSP: parseFloat(
+            document.getElementById("temperatureSetpointMXC").value
+          ),
+          MXCP: parseFloat(
+            document.getElementById("proportionalGainMXC").value
+          ),
+          MXCI: parseFloat(document.getElementById("integralGainMXC").value),
+          MXCD: parseFloat(document.getElementById("derivativeGainMXC").value),
+          MXCHR: parseFloat(document.getElementById("heaterRangeMXC").value),
+        };
+
+        const commands = [];
+
+        if (!isNaN(values.MXCSP)) {
+          if (values.MXCSP < 0 || values.MXCSP > 500) {
+            addLogEntry(
+              "Error: MXC Setpoint must be between 0.0 and 500.0 K",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "MXCSP",
+            command: `set_mxc_temperature_setpoint:${values.MXCSP}`,
+          });
+        }
+
+        if (!isNaN(values.MXCP)) {
+          if (values.MXCP < 0 || values.MXCP > 10) {
+            addLogEntry(
+              "Error: MXC Proportional Gain must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "MXCP",
+            command: `set_mxc_proportional_gain:${values.MXCP}`,
+          });
+        }
+
+        if (!isNaN(values.MXCI)) {
+          if (values.MXCI < 0 || values.MXCI > 10) {
+            addLogEntry(
+              "Error: MXC Integral Gain must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "MXCI",
+            command: `set_mxc_integral_gain:${values.MXCI}`,
+          });
+        }
+
+        if (!isNaN(values.MXCD)) {
+          if (values.MXCD < 0 || values.MXCD > 100) {
+            addLogEntry(
+              "Error: MXC Derivative Gain must be between 0.0 and 100.0",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "MXCD",
+            command: `set_mxc_derivative_gain:${values.MXCD}`,
+          });
+        }
+
+        if (!isNaN(values.MXCHR)) {
+          if (values.MXCHR < 0 || values.MXCHR > 8) {
+            addLogEntry(
+              "Error: There are only eight heater ranges (0-8) available (being 0 OFF)",
+              "received"
+            );
+            return;
+          }
+          commands.push({
+            type: "MXCHR",
+            command: `set_mxc_heater_range:${values.MXCHR}`,
+          });
+        }
+
+        const progressContainer = document.getElementById("progressContainer");
+        const progressBar = document.getElementById("progressBar");
+        const progressText = document.getElementById("progressText");
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "Processing...";
+
+        for (const cmd of commands) {
+          try {
+            addLogEntry(`Sending MXC command: ${cmd.command}`, "sent");
+            const response = await sendCommandToServer(cmd.command);
+            addLogEntry(`Server response: ${response}`, "received");
+            console.log(response);
+            // Update last sent value if successful
+            lastSentValues[cmd.type] = values[cmd.type];
+          } catch (error) {
+            addLogEntry(
+              `Error sending ${cmd.type}: ${error.message}`,
+              "received"
+            );
+          }
+          // Update progress bar
+          const progress =
+            ((commands.indexOf(cmd) + 1) / commands.length) * 100;
+          progressBar.style.width = `${progress}%`;
+          progressText.textContent = `Processing... ${Math.round(progress)}%`;
+        }
+
+        // Hide progress bar after completion
+        setTimeout(() => {
+          progressContainer.style.display = "none";
+        }, 1000);
+      }
+    </script>
+
+    <script>
+      // Switch between tabs script
+      // This script handles the tab switching functionality
+      const tabButtons = document.querySelectorAll(".tab-button");
+      const tabContents = document.querySelectorAll(".tab-content");
+
+      tabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          // Remove active class
+          tabButtons.forEach((btn) => btn.classList.remove("active"));
+          tabContents.forEach((tab) => tab.classList.remove("active"));
+
+          // Add active class to the clicked tab
+          button.classList.add("active");
+          const target = document.getElementById(button.dataset.target);
+          if (target) {
+            target.classList.add("active");
+            setupCollapsibleSections(target); // <-- re-initialize here
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
