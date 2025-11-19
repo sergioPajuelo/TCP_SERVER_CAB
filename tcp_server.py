@@ -2,7 +2,7 @@ import socket
 import random
 import time
 import threading
-from lakeshore370_dummy import LakeShore370, DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST
+from lakeshore370 import LakeShore370, DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST
 
 ls = LakeShore370()
 
