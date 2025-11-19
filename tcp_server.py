@@ -10,7 +10,7 @@ DEFAULT_CHANNELS = [1, 2, 5, 6]
 DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
 
 # Configuration
-HOST = '0.0.0.0' # Listen on all network interfaces
+HOST = '192.168.38.3' # Listen on all network interfaces
 PORT = 65432  # Port to listen on
 
 # Mutex to protect the heater power level
