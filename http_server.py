@@ -5,7 +5,7 @@ import threading
 import time
 
 # Configuration for the TCP socket server
-TCP_HOST = '192.168.38.3'  # Replace with the Raspberry Pi's IP address
+TCP_HOST = '127.0.0.1'      #Replace with the Raspberry Pi's IP address: 192.168.38.3
 TCP_PORT = 65432 
 
 # Global variables to store the latest temperature data
@@ -46,6 +46,9 @@ current_P4K = None
 current_PSTILL = None
 current_PMXC = None
 current_enabled_MXC = None
+current_enabled_50K = None
+current_enabled_4K = None
+current_enabled_STILL = None
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -55,7 +58,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            with open('/home/SuperTech/TCP_SERVER_CAB/index.html', 'rb') as file:   
+            with open('C:\CuartoInformatica\Practicas_CAB\TCP_SERVER\index.html', 'rb') as file:       #/home/SuperTech/TCP_SERVER_CAB/index.html
                 self.wfile.write(file.read())
 
         elif self.path == '/get-data':
@@ -95,8 +98,11 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                                    "RSTILL": current_RSTILL,
                                    "RMXC": current_RMXC,
                                    "PMXC": current_PMXC,
-                                   "enabledMXC": current_enabled_MXC
-                                   })
+                                   "enabledMXC": current_enabled_MXC,
+                                   "enabled50K": current_enabled_50K,
+                                   "enabled4K": current_enabled_4K,
+                                   "enabledSTILL": current_enabled_STILL
+                                })
                                    
             self.wfile.write(response.encode('utf-8'))
         else:
@@ -189,6 +195,9 @@ def receive_sensor_data(tcp_socket):
     global current_PMXC
     
     global current_enabled_MXC
+    global current_enabled_50K
+    global current_enabled_4K
+    global current_enabled_STILL
     
     global current_mxc_temperature_setpoint
     global current_mxc_proportional_gain
@@ -312,6 +321,13 @@ def receive_sensor_data(tcp_socket):
                     current_enabled_MXC = int(params[37].split(':')[-1])
                 except Exception as e:
                     print(f"Error parsing enabled MXC variable: {e}")
+
+                try:
+                    current_enabled_50K = int(params[38].split(':')[-1])
+                    current_enabled_4K = int(params[39].split(':')[-1])
+                    current_enabled_STILL = int(params[40].split(':')[-1])
+                except Exception as e:
+                    print(f"Error parsing enabled 50K/4K/STILL variables: {e}")
 
 
         except Exception as e:

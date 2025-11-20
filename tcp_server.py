@@ -2,7 +2,7 @@ import socket
 import random
 import time
 import threading
-from lakeshore370 import LakeShore370, DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST
+from lakeshore370_dummy import LakeShore370, DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST
 
 ls = LakeShore370()
 
@@ -404,12 +404,11 @@ def handle_command(command):
         try:
             new_dwell_time = float(command.split(":")[-1])
             if new_dwell_time >= 0.0:
-                message = f"Setting dwell time for MXC to {new_dwell_time} s ; "
                 with heater_mutex: success = ls.set_channel_dwell_time(new_dwell_time, channel=6)  # Channel 6 is MXC
                 if success:
-                    message += f"\nSet dwell time for MXC to {new_dwell_time} s"
+                    message = f"✅ Dwell time succesfully set for MXC to {new_dwell_time} s"
                 else:
-                    message += f"Failed to set dwell time for MXC"
+                    message = f"❌ Failed to set dwell time for MXC"
                 print(message)                
             else:
                 message += f"Dwell time must be non-negative"
@@ -421,22 +420,143 @@ def handle_command(command):
             print(message)
             return message
 
+    elif command.startswith("set_dwell_50k"):
+        try:
+            new_dwell_time = float(command.split(":")[-1])
+            if new_dwell_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_dwell_time(new_dwell_time, channel=1) 
+                if success:
+                    message = f"✅ Dwell time succesfully set for 50K to {new_dwell_time} s"
+                else:
+                    message = "❌ Failed to set dwell time for 50K"
+                print(message)
+            else:
+                message = "Dwell time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting dwell time for 50K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_dwell_4k"):
+        try:
+            new_dwell_time = float(command.split(":")[-1])
+            if new_dwell_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_dwell_time(new_dwell_time, channel=2)
+                if success:
+                    message = f"✅ Dwell time succesfully set for 4K to {new_dwell_time} s"
+                else:
+                    message = "❌ Failed to set dwell time for 4K"
+                print(message)
+            else:
+                message = "Dwell time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting dwell time for 4K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_dwell_still"):
+        try:
+            new_dwell_time = float(command.split(":")[-1])
+            if new_dwell_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_dwell_time(new_dwell_time, channel=5) 
+                if success:
+                    message = f"✅ Dwell time succesfully set for STILL to {new_dwell_time} s"
+                else:
+                    message = "❌ Failed to set dwell time for STILL"
+                print(message)
+            else:
+                message = "Dwell time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting dwell time for STILL: {e}"
+            print(message)
+            return message
+
     elif command.startswith("set_pause_mxc"):
         # Sintaxis to set the pause time for MXC: "set_pause_mxc:5.0"
         try:
             new_pause_time = float(command.split(":")[-1])
             if new_pause_time >= 0.0:
-                with heater_mutex: ls.set_channel_pause_time(6, new_pause_time)  # Channel 6 is MXC
-                message = f"Set pause time for MXC to {new_pause_time} s"
+                with heater_mutex: ls.set_channel_pause_time(new_pause_time, channel=6)  # Channel 6 is MXC
+                message = f"✅ Pause time succesfully set for MXC to {new_pause_time} s"
                 print(message)
             else:
-                message = f"Pause time must be non-negative"
+                message = f"❌ Pause time must be non-negative"
                 print(message)
             return message
         except Exception as e:
             message = f"Error setting pause time for MXC: {e}"
             print(message)
             return message
+        
+    elif command.startswith("set_pause_50k"):
+        try:
+            new_pause_time = float(command.split(":")[-1])
+            if new_pause_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_pause_time(new_pause_time, channel=1)
+                if success:
+                    message = f"✅ Pause time succesfully set for 50k to {new_pause_time} s"
+                else:
+                    message = "❌ Failed to set pause time for 50K"
+                print(message)
+            else:
+                message = "Pause time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting pause time for 50K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_pause_4k"):
+        try:
+            new_pause_time = float(command.split(":")[-1])
+            if new_pause_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_pause_time(new_pause_time, channel=2)
+                if success:
+                    message = f"✅ Pause time succesfully set for 4k to {new_pause_time} s"
+                else:
+                    message = "❌ Failed to set pause time for 4K"
+                print(message)
+            else:
+                message = "Pause time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting pause time for 4K: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_pause_still"):
+        try:
+            new_pause_time = float(command.split(":")[-1])
+            if new_pause_time >= 0.0:
+                with heater_mutex:
+                    success = ls.set_channel_pause_time(new_pause_time, channel=5)
+                if success:
+                    message = f"✅ Pause time succesfully set for STILL to {new_pause_time} s"
+                else:
+                    message = "❌ Failed to set pause time for STILL"
+                print(message)
+            else:
+                message = "Pause time must be non-negative"
+                print(message)
+            return message
+        except Exception as e:
+            message = f"Error setting pause time for STILL: {e}"
+            print(message)
+            return message
+
     elif command.startswith("set_sensor_range_mxc"):
         try:
             new_range = str(command.split(":")[-1])
@@ -538,6 +658,85 @@ def handle_command(command):
             message = f"❌ Error setting 50k sensor status: {e}"
             print(message)
             time.sleep(1.0) 
+            return message
+
+
+    elif command.startswith("set_channel_4k"):
+        try:
+            channel_status = int(command.split(":")[-1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=2))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ 4K sensor is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(2)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(2)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ 4K sensor is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set 4K sensor {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting 4K sensor status: {e}"
+            print(message)
+            return message
+
+    elif command.startswith("set_channel_still"):
+        try:
+            channel_status = int(command.split(":")[-1])
+
+            with heater_mutex:
+                current_status = int(ls.get_channel_status(channel=5))
+
+            time.sleep(0.5)
+            if current_status == channel_status:
+                message = f"❌ STILL sensor is already {'On' if bool(current_status) else 'Off'}"
+                print(message)
+                return message
+
+            attempts = 5
+            success = False
+            for _ in range(attempts):
+                if bool(channel_status):
+                    with heater_mutex:
+                        success = ls.set_channel_on(5)
+                else:
+                    with heater_mutex:
+                        success = ls.set_channel_off(5)
+                time.sleep(0.5)
+                if success:
+                    break
+
+            if success:
+                message = f"✅ STILL sensor is now {'On' if bool(channel_status) else 'Off'}"
+            else:
+                message = f"❌ Failed to set STILL sensor {'On' if bool(channel_status) else 'Off'}"
+
+            print(message)
+            return message
+
+        except Exception as e:
+            message = f"❌ Error setting STILL sensor status: {e}"
+            print(message)
             return message
 
     elif command.startswith("set_sensor_mode_mxc"):
@@ -709,7 +908,11 @@ def lakeshore_temperature_sensor():
 
         # Which channels are enabled?
         try:
-            with heater_mutex: channel_enabled_MXC = int(ls.get_channel_status(6))  # MXC is channel 6
+            with heater_mutex: 
+                channel_enabled_MXC = int(ls.get_channel_status(6))  # MXC is channel 6
+                channel_enabled_50K = int(ls.get_channel_status(1))
+                channel_enabled_STILL = int(ls.get_channel_status(5))
+
         except Exception as e:
             print(f"Error reading MXC channel status\nReason: {e}")
             channel_enabled_MXC = 0
@@ -894,7 +1097,10 @@ def broadcast_temperature(sensorValues, controlParams, sensorParams):
                     f"P4K: {powers['4K']}," +
                     f"PSTILL: {powers['STILL']}," +
                     f"PMXC: {powers['MXC']}," +
-                    f"enabledMXC: {sensorParams['enabledMXC']}\n"
+                    f"enabledMXC: {sensorParams['enabledMXC']}," +
+                    f"enabled50K: {int(ls.get_channel_status(1))}," +
+                    f"enabled4K: {int(ls.get_channel_status(2))}," +
+                    f"enabledSTILL: {int(ls.get_channel_status(5))}\n"
                     ).encode('utf-8')
         
     except Exception as e:

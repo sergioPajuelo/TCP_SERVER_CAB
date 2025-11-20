@@ -426,7 +426,7 @@
                     <label for="heaterRangeMXC" style="width: 120px"
                       >Heater Range:</label
                     >
-                    <
+                    <select
                       id="heaterRangeMXC"
                       class="control-input"
                       style="width: 120px"
@@ -597,7 +597,6 @@
                 <option value="1">Current</option>
               </select>
 
-              <!-- Botón a la derecha de toda la fila -->
               <button
                 class="inline-button"
                 style="margin-left: auto; padding: 8px 18px; min-width: 160px"
@@ -638,12 +637,22 @@
               <div class="control-row">
                 <button onclick="writeSettingsSTILL()">Write Settings</button>
               </div>
-              <div class="control-row">
-                <button onclick="toggleChannelSTILL()">On/Off</button>
-              </div>
             </div>
           </div>
           <div class="lakeshore-plot-panel">
+            <div class="control-row" style="align-items: center">
+              <label for="toggleSTILL" style="margin-right: 0px">
+                Channel On/Off
+              </label>
+              <label class="switch" style="margin-right: 50px">
+                <input
+                  type="checkbox"
+                  id="toggleSTILL"
+                  onchange="toggleChannelSTILL()"
+                />
+                <span class="slider round"></span>
+              </label>
+            </div>
             <canvas
               id="temperatureChartSTILL"
               width="800"
@@ -679,11 +688,24 @@
                 />
               </div>
               <div class="control-row">
-                <button onclick="toggleChannel4K()">On/Off</button>
+                <button onclick="writeSettings4K()">Write Settings</button>
               </div>
             </div>
           </div>
           <div class="lakeshore-plot-panel">
+            <div class="control-row" style="align-items: center">
+              <label for="toggle4k" style="margin-right: 0px">
+                Channel On/Off
+              </label>
+              <label class="switch" style="margin-right: 50px">
+                <input
+                  type="checkbox"
+                  id="toggle4k"
+                  onchange="toggleChannel4k()"
+                />
+                <span class="slider round"></span>
+              </label>
+            </div>
             <canvas id="temperatureChart4K" width="800" height="200"></canvas>
           </div>
         </div>
@@ -715,15 +737,42 @@
                 />
               </div>
               <div class="control-row">
-                <label>Channel 50K</label>
-                <label class="switch">
-                  <input type="checkbox" id="toggle50K" onclick="toggleChannel50K()" />
-                  <span class="slider"></span>
-                </label>
+                <button onclick="writeSettings50K()">Write Settings</button>
               </div>
             </div>
           </div>
           <div class="lakeshore-plot-panel">
+            <div class="control-row" style="margin-bottom: 10px">
+              <!-- Toggle switch -->
+              <label for="toggle50K" style="margin-right: 0px"
+                >Channel On/Off</label
+              >
+              <label class="switch" style="margin-right: 50px">
+                <input
+                  type="checkbox"
+                  id="toggle50K"
+                  onchange="toggleChannel50K()"
+                />
+                <span class="slider round"></span>
+              </label>
+
+              <!-- Time range for 50K-->
+              <label for="timeRange50K" style="margin-right: 0px"
+                >Time Range:</label
+              >
+              <select
+                id="timeRange50K"
+                style="margin-right: 50px"
+                onchange="updateTimeRange50k()"
+              >
+                <option value="60" selected>1 Minute</option>
+                <option value="300">5 Minutes</option>
+                <option value="900">15 Minutes</option>
+                <option value="1800">30 Minutes</option>
+                <option value="3600">1 Hour</option>
+                <option value="21600">6 Hours</option>
+              </select>
+            </div>
             <canvas id="temperatureChart50K" width="800" height="200"></canvas>
           </div>
         </div>
@@ -884,6 +933,7 @@
       let temperatureChartMXC;
       let currentTimeRangeBB = 60; // Start with 1 minute as default
       let currentTimeRangeMXC = 60; // Start with 1 minute as default
+      let currentTimeRange50K = 60; //Start with 1 minute as default
       let tcpConnectionStatus = null;
       let firstDataTime = null;
       let lastUpdateTime = null;
@@ -906,6 +956,8 @@
 
       // Track parameter values
       let currentParameters = {
+        "50k": null,
+        "4k": null,
         STILL: null,
         MXC: null,
         MXCSP: null,
@@ -928,6 +980,10 @@
         derivativeGain: null,
         RMXC: null,
         PMXC: null,
+        enabledMXC: null,
+        enabled50K: null,
+        enabled4K: null,
+        enabledSTILL: null,
       };
 
       // Track last sent values
@@ -1072,6 +1128,45 @@
             if (!select.options[i].disabled) {
               select.selectedIndex = i;
               currentTimeRangeMXC = parseInt(select.options[i].value, 10);
+              break;
+            }
+          }
+        }
+      }
+
+      function updateTimeRangeOptions50K() {
+        const select = document.getElementById("timeRange50K");
+        const store = chartDataStore["50K"];
+        if (!store || !store.startTime) return;
+
+        const totalElapsedSec = Math.max(
+          0,
+          (Date.now() - store.startTime) / 1000
+        );
+
+        select.innerHTML = "";
+        for (let i = 0; i < timeRangeOptions.length; i++) {
+          const option = timeRangeOptions[i];
+          const opt = document.createElement("option");
+          opt.value = option.value;
+          opt.textContent = option.label;
+
+          if (i === 0) {
+            opt.disabled = false;
+          } else {
+            const prevValue = timeRangeOptions[i - 1].value;
+            opt.disabled = totalElapsedSec < prevValue;
+          }
+
+          if (option.value === currentTimeRange50K) opt.selected = true;
+          select.appendChild(opt);
+        }
+
+        if (select.options[select.selectedIndex]?.disabled) {
+          for (let i = select.options.length - 1; i >= 0; i--) {
+            if (!select.options[i].disabled) {
+              select.selectedIndex = i;
+              currentTimeRange50K = parseInt(select.options[i].value, 10);
               break;
             }
           }
@@ -1426,7 +1521,11 @@
           store.setpoint.push(setpoint);
         }
 
-        updateTimeRangeOptions();
+        if (chartId === "MXC") {
+          updateTimeRangeOptions();
+        } else if (chartId === "50K") {
+          updateTimeRangeOptions50K();
+        }
 
         console.log(
           `➡ Pushed to ${chartId}: T=${temperature}, S=${setpoint}, t=${relTime.toFixed(
@@ -1435,8 +1534,10 @@
         );
         console.log(`✅ Store after push (${chartId}):`, store);
 
-        // Filter data based on time range
-        const displayTimeStart = Math.max(0, relTime - currentTimeRangeMXC);
+        const currentRange =
+          chartId === "50K" ? currentTimeRange50K : currentTimeRangeMXC;
+
+        const displayTimeStart = Math.max(0, relTime - currentRange);
         const labelsFiltered = [];
         const tempFiltered = [];
         const setpointFiltered = [];
@@ -1461,7 +1562,7 @@
 
         // Update x-axis scale
         chart.options.scales.x.min = 0;
-        chart.options.scales.x.max = currentTimeRangeMXC;
+        chart.options.scales.x.max = currentRange;
 
         // Optional Y-axis safety clamp
         chart.options.scales.y.suggestedMin = 0;
@@ -1476,6 +1577,12 @@
 
         // Re-slice from the store immediately so the axis updates now
         redrawFromStore("MXC");
+      }
+
+      function updateTimeRange50K() {
+        const timeRangeSelect = document.getElementById("timeRange50K");
+        currentTimeRange50K = parseInt(timeRangeSelect.value, 10);
+        redrawFromStore("50K");
       }
 
       function updateMXCTemperature(value_mK) {
@@ -1776,6 +1883,12 @@
           console.log("✅ Received data from server:", data);
 
           // Update parameters if they changed
+          if (data["50K"] !== undefined) {
+            currentParameters["50K"] = parseFloat(data["50K"]);
+          }
+          if (data["4K"] !== undefined) {
+            currentParameters["4K"] = parseFloat(data["4K"]);
+          }
           if (data.STILL !== undefined) {
             currentParameters.STILL = parseFloat(data.STILL);
           }
@@ -1790,6 +1903,15 @@
           }
           if (data.enabledMXC !== undefined) {
             currentParameters.enabledMXC = parseInt(data.enabledMXC);
+          }
+          if (data.enabled50K !== undefined) {
+            currentParameters.enabled50K = parseInt(data.enabled50K);
+          }
+          if (data.enabled4K !== undefined) {
+            currentParameters.enabled4K = parseInt(data.enabled4K);
+          }
+          if (data.enabledSTILL !== undefined) {
+            currentParameters.enabledSTILL = parseInt(data.enabledSTILL);
           }
           if (data.setpoint !== undefined) {
             currentParameters.temperatureSetpoint = parseFloat(data.setpoint);
@@ -1877,6 +1999,15 @@
             autorangeMXC: currentParameters.autorangeMXC,
           };
 
+          // Update the 50k chart with the new temperature
+          if (currentParameters["50K"] !== null) {
+            updateTemperatureChart("50K", currentParameters["50K"]);
+          }
+
+          //Update the 4k chart with the new temperature
+          if (currentParameters["4K"] !== null) {
+            updateTemperatureChart("4K", currentParameters["4K"]);
+          }
           // Update the STILL chart with the new temperature
           if (currentParameters.STILL !== null) {
             console.log(
@@ -1925,6 +2056,42 @@
             }
           }
 
+          const toggle50K = document.getElementById("toggle50K");
+          const enabled50K = !!currentParameters.enabled50K;
+
+          if (toggle50K.checked !== enabled50K) {
+            toggle50K.checked = enabled50K;
+            console.log(
+              `🔁 Sync 50K toggle -> ${
+                enabled50K ? "ON" : "OFF"
+              } (from controller)`
+            );
+          }
+
+          const toggleSTILL = document.getElementById("toggleSTILL");
+          const enabledSTILL = !!currentParameters.enabledSTILL;
+
+          if (toggleSTILL.checked !== enabledSTILL) {
+            toggleSTILL.checked = enabledSTILL;
+            console.log(
+              `🔁 Sync STILL toggle -> ${
+                enabledSTILL ? "ON" : "OFF"
+              } (from controller)`
+            );
+          }
+
+          const toggle4k = document.getElementById("toggle4k");
+          const enabled4k = !!currentParameters.enabled4K;
+
+          if (toggle4k.checked !== enabled4k) {
+            toggle4k.checked = enabled4k;
+            console.log(
+              `🔁 Sync 4k toggle -> ${
+                enabled4k ? "ON" : "OFF"
+              } (from controller)`
+            );
+          }
+
           if (tcpConnectionStatus === false) {
             await updateConnectionStatus();
           }
@@ -1951,6 +2118,7 @@
           false,
           "Temperature 50K"
         );
+
         charts["4K"] = createTemperatureChart(
           "temperatureChart4K",
           false,
@@ -1996,7 +2164,7 @@
         const checkbox = document.getElementById("toggle50K");
         const value = checkbox.checked ? 1 : 0;
 
-        const command = `set_channel_50k:${value}`;
+        const command = `set_channel_50k: ${value}`;
 
         try {
           addLogEntry(`Sending 50K command: ${command}`, "sent");
@@ -2039,6 +2207,44 @@
             "received"
           );
           console.error(error);
+        }
+      }
+
+      async function toggleChannelSTILL() {
+        const checkbox = document.getElementById("toggleSTILL");
+        const value = checkbox.checked ? 1 : 0;
+
+        const command = `set_channel_still:${value}`;
+
+        try {
+          addLogEntry(`Sending STILL command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+        } catch (error) {
+          checkbox.checked = !checkbox.checked;
+          addLogEntry(
+            `Error sending set_channel_still: ${error.message}`,
+            "received"
+          );
+        }
+      }
+
+      async function toggleChannel4k() {
+        const checkbox = document.getElementById("toggle4k");
+        const value = checkbox.checked ? 1 : 0;
+
+        const command = `set_channel_4k:${value}`;
+
+        try {
+          addLogEntry(`Sending 4k command: ${command}`, "sent");
+          const response = await sendCommandToServer(command);
+          addLogEntry(`Server response: ${response}`, "received");
+        } catch (error) {
+          checkbox.checked = !checkbox.checked;
+          addLogEntry(
+            `Error sending set_channel_4k: ${error.message}`,
+            "received"
+          );
         }
       }
 
@@ -2354,6 +2560,168 @@
         setTimeout(() => {
           progressContainer.style.display = "none";
         }, 1000);
+      }
+
+      async function writeSettingsSTILL() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send STILL command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const dwell = parseFloat(document.getElementById("dwellSTILL").value);
+        const pause = parseFloat(document.getElementById("pauseSTILL").value);
+        const commands = [];
+
+        if (!isNaN(dwell)) {
+          if (dwell < 0 || dwell > 10) {
+            addLogEntry(
+              "Error: STILL dwell time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_dwell_still:${dwell}`);
+        }
+
+        if (!isNaN(pause)) {
+          if (pause < 0 || pause > 10) {
+            addLogEntry(
+              "Error: STILL pause time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_pause_still:${pause}`);
+        }
+
+        if (commands.length === 0) {
+          addLogEntry("No STILL sensor parameter changes detected", "status");
+          return;
+        }
+
+        for (const cmd of commands) {
+          try {
+            addLogEntry(`Sending STILL command: ${cmd}`, "sent");
+            const response = await sendCommandToServer(cmd);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(
+              `Error sending STILL command ${cmd}: ${error.message}`,
+              "received"
+            );
+          }
+        }
+      }
+
+      async function writeSettings50K() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send 50K command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const dwell = parseFloat(document.getElementById("dwell50K").value);
+        const pause = parseFloat(document.getElementById("pause50K").value);
+        const commands = [];
+
+        if (!isNaN(dwell)) {
+          if (dwell < 0 || dwell > 10) {
+            addLogEntry(
+              "Error: 50K dwell time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_dwell_50k:${dwell}`);
+        }
+
+        if (!isNaN(pause)) {
+          if (pause < 0 || pause > 10) {
+            addLogEntry(
+              "Error: 50K pause time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_pause_50k:${pause}`);
+        }
+
+        if (commands.length === 0) {
+          addLogEntry("No 50K sensor parameter changes detected", "status");
+          return;
+        }
+
+        for (const cmd of commands) {
+          try {
+            addLogEntry(`Sending 50K command: ${cmd}`, "sent");
+            const response = await sendCommandToServer(cmd);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(
+              `Error sending 50K command ${cmd}: ${error.message}`,
+              "received"
+            );
+          }
+        }
+      }
+
+      async function writeSettings4K() {
+        if (tcpConnectionStatus === false) {
+          addLogEntry(
+            "Cannot send 4K command: No connection to TCP server",
+            "status"
+          );
+          return;
+        }
+
+        const dwell = parseFloat(document.getElementById("dwell4K").value);
+        const pause = parseFloat(document.getElementById("pause4K").value);
+        const commands = [];
+
+        if (!isNaN(dwell)) {
+          if (dwell < 0 || dwell > 10) {
+            addLogEntry(
+              "Error: 4K dwell time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_dwell_4k:${dwell}`);
+        }
+
+        if (!isNaN(pause)) {
+          if (pause < 0 || pause > 10) {
+            addLogEntry(
+              "Error: 4K pause time must be between 0.0 and 10.0",
+              "received"
+            );
+            return;
+          }
+          commands.push(`set_pause_4k:${pause}`);
+        }
+
+        if (commands.length === 0) {
+          addLogEntry("No 4K sensor parameter changes detected", "status");
+          return;
+        }
+
+        for (const cmd of commands) {
+          try {
+            addLogEntry(`Sending 4K command: ${cmd}`, "sent");
+            const response = await sendCommandToServer(cmd);
+            addLogEntry(`Server response: ${response}`, "received");
+          } catch (error) {
+            addLogEntry(
+              `Error sending 4K command ${cmd}: ${error.message}`,
+              "received"
+            );
+          }
+        }
       }
     </script>
 
