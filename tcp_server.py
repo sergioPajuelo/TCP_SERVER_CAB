@@ -2,12 +2,12 @@ import socket
 import random
 import time
 import threading
-from lakeshore370_dummy import LakeShore370, DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST
+from lakeshore370_dummy import LakeShore370
+from default_config import DEFAULT_PID, CURRENT_RANGE_LIST, DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS, SENSOR_RESISTANCE_RANGE_LIST, DEFAULT_CHANNELS, DEFAULT_CHANNELS_ID, DEFAULT_SETTINGS
 
 ls = LakeShore370()
 
-DEFAULT_CHANNELS = [1, 2, 5, 6]
-DEFAULT_CHANNELS_ID = ["50K", "4K", "STILL", "MXC"]
+
 
 # Configuration
 HOST = '0.0.0.0' # Listen on all network interfaces
@@ -15,6 +15,73 @@ PORT = 65432  # Port to listen on
 
 # Mutex to protect the heater power level
 heater_mutex = threading.Lock() 
+
+
+
+def apply_default_channel_timing(channel: int) -> bool:
+    """
+    Aplica los tiempos por defecto (dwell y pause) de DEFAULT_SETTINGS
+    al canal indicado del LakeShore.
+    """
+    try:
+        # DEFAULT_SETTINGS[channel] = ['010, 003, 01, 2']
+        config_str = DEFAULT_SETTINGS[channel][0]
+        parts = [x.strip() for x in config_str.split(",")]
+        dwell_str, pause_str = parts[0], parts[1]
+
+        dwell = float(dwell_str)
+        pause = float(pause_str)
+    except Exception as e:
+        print(f"Error parsing DEFAULT_SETTINGS for channel {channel}: {e}")
+        return False
+
+    ok = True
+    try:
+        with heater_mutex:
+            ok_dwell = ls.set_channel_dwell_time(dwell, channel=channel)
+        if not ok_dwell:
+            ok = False
+    except Exception as e:
+        print(f"Error applying default dwell to channel {channel}: {e}")
+        ok = False
+
+    try:
+        with heater_mutex:
+            ok_pause = ls.set_channel_pause_time(pause, channel=channel)
+        if not ok_pause:
+            ok = False
+    except Exception as e:
+        print(f"Error applying default pause to channel {channel}: {e}")
+        ok = False
+
+    if ok:
+        print(f"✅ Applied default timing to channel {channel}: dwell={dwell}s, pause={pause}s")
+    else:
+        print(f"⚠️ Could not fully apply default timing to channel {channel}")
+
+    print(f"🔧 Channel {channel} initialised to default settings")
+    return ok
+
+def apply_default_mxc_settings() -> None:
+    """
+    Aplica los parámetros por defecto de MXC (PID y ajustes de resistencia).
+    """
+    try:
+        with heater_mutex:
+            ls.set_control_parameters(
+                P=DEFAULT_PID["P"],
+                I=DEFAULT_PID["I"],
+                D=DEFAULT_PID["D"],
+            )
+
+            ls.set_sensor_resistance_settings(
+                channel=6,
+                settings=DEFAULT_MXC_RESISTANCE_RANGE_SETTINGS,
+            )
+
+        print("✅ Applied default MXC PID and resistance settings")
+    except Exception as e:
+        print(f"Error applying default MXC settings: {e}")
 
 # Global variables
 clients = [] # List to keep track of connected clients
@@ -580,7 +647,9 @@ def handle_command(command):
             return message
     elif command.startswith("set_channel_mxc"):
         try:
-            channel_status = int(command.split(":")[-1])
+            parts = command.split(":")
+            channel_status = int(parts[1])    
+            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel = 6))
@@ -605,6 +674,9 @@ def handle_command(command):
                 if success: break
 
             if success:
+                if bool(channel_status and reset_flag):
+                    apply_default_channel_timing(6)
+                    apply_default_mxc_settings()
                 message = f"✅ MXC sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set MXC sensor {'On' if bool(channel_status) else 'Off'}"
@@ -621,7 +693,9 @@ def handle_command(command):
 
     elif command.startswith("set_channel_50k"):
         try:
-            channel_status = int(command.split(":")[-1])
+            parts = command.split(":")
+            channel_status = int(parts[1])    
+            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel = 1))
@@ -646,6 +720,8 @@ def handle_command(command):
                 if success: break
 
             if success:
+                if bool(channel_status and reset_flag):
+                    apply_default_channel_timing(1)
                 message = f"✅ 50k sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set 50k sensor {'On' if bool(channel_status) else 'Off'}"
@@ -663,7 +739,9 @@ def handle_command(command):
 
     elif command.startswith("set_channel_4k"):
         try:
-            channel_status = int(command.split(":")[-1])
+            parts = command.split(":")
+            channel_status = int(parts[1])    
+            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel=2))
@@ -688,6 +766,8 @@ def handle_command(command):
                     break
 
             if success:
+                if bool(channel_status and reset_flag):
+                    apply_default_channel_timing(2)
                 message = f"✅ 4K sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set 4K sensor {'On' if bool(channel_status) else 'Off'}"
@@ -702,7 +782,9 @@ def handle_command(command):
 
     elif command.startswith("set_channel_still"):
         try:
-            channel_status = int(command.split(":")[-1])
+            parts = command.split(":")
+            channel_status = int(parts[1])    
+            reset_flag = int(parts[2]) if len(parts) > 2 else 1
 
             with heater_mutex:
                 current_status = int(ls.get_channel_status(channel=5))
@@ -727,6 +809,8 @@ def handle_command(command):
                     break
 
             if success:
+                if bool(channel_status and reset_flag):
+                    apply_default_channel_timing(5)
                 message = f"✅ STILL sensor is now {'On' if bool(channel_status) else 'Off'}"
             else:
                 message = f"❌ Failed to set STILL sensor {'On' if bool(channel_status) else 'Off'}"

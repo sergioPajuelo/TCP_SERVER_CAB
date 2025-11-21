@@ -318,6 +318,13 @@
         color: #007bff; /* blue */
         margin-left: 8px;
       }
+      .reset-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        margin-top: 4px;
+      }
     </style>
   </head>
 
@@ -481,6 +488,7 @@
               <label for="toggleMXC" style="margin-right: 0px"
                 >Channel On/Off</label
               >
+
               <label class="switch" style="margin-right: 50px">
                 <input
                   type="checkbox"
@@ -488,6 +496,10 @@
                   onchange="toggleChannelMXC()"
                 />
                 <span class="slider round"></span>
+              </label>
+              <label class="reset-toggle">
+                <input type="checkbox" id="reset-mxc" checked />
+                Reset when switching on
               </label>
               <!-- Time range selector for MXC Stage -->
               <label for="timeRangeMXC" style="margin-right: 0px"
@@ -652,6 +664,10 @@
                 />
                 <span class="slider round"></span>
               </label>
+              <label class="reset-toggle">
+                <input type="checkbox" id="reset-still" checked />
+                Reset when switching on
+              </label>
             </div>
             <canvas
               id="temperatureChartSTILL"
@@ -704,6 +720,10 @@
                   onchange="toggleChannel4k()"
                 />
                 <span class="slider round"></span>
+                <label class="reset-toggle">
+                  <input type="checkbox" id="reset-4k" checked />
+                  Reset when switching on
+                </label>
               </label>
             </div>
             <canvas id="temperatureChart4K" width="800" height="200"></canvas>
@@ -754,6 +774,10 @@
                   onchange="toggleChannel50K()"
                 />
                 <span class="slider round"></span>
+                <label class="reset-toggle">
+                  <input type="checkbox" id="reset-50k" checked />
+                  Reset when switching on
+                </label>
               </label>
 
               <!-- Time range for 50K-->
@@ -1054,7 +1078,7 @@
 
       // Variable to track last time parameters were updated and when to update them again
       let lastParameterBoxUpdateTime = 0;
-      const parameterBoxUpdateInterval = 60000; // 1 minute
+      const parameterBoxUpdateInterval = 60000; // 1 minute = 60000
 
       // Set up collapsible sections
       function setupCollapsibleSections(context = document) {
@@ -1867,7 +1891,7 @@
 
       // Function that handles fetching sensor data from the server
       // and updates the UI accordingly
-      async function fetchSensorData() {
+      async function fetchSensorData(forceUpdateControls = false) {
         try {
           // Fetch data from the server using the /get-data channel
           const response = await fetch("/get-data");
@@ -1975,7 +1999,10 @@
           // Update UI controls if parameters changed every minute
           // (or the time specified in parameterBoxUpdateInterval variable)
           const now = Date.now();
-          if (now - lastParameterBoxUpdateTime > parameterBoxUpdateInterval) {
+          if (
+            forceUpdateControls ||
+            now - lastParameterBoxUpdateTime > parameterBoxUpdateInterval
+          ) {
             console.log("🔄 Updating parameter controls with new values");
             lastParameterBoxUpdateTime = now;
             updateParameterControls();
@@ -2163,8 +2190,9 @@
       async function toggleChannel50K() {
         const checkbox = document.getElementById("toggle50K");
         const value = checkbox.checked ? 1 : 0;
+        const resetFlag = document.getElementById("reset-50k").checked ? 1 : 0;
 
-        const command = `set_channel_50k: ${value}`;
+        const command = `set_channel_50k:${value}:${resetFlag}`;
 
         try {
           addLogEntry(`Sending 50K command: ${command}`, "sent");
@@ -2175,6 +2203,10 @@
             `Channel 50K is now ${checkbox.checked ? "enabled" : "disabled"}`
           );
           console.log(response);
+
+          if (value === 1 && resetFlag === 1) {
+            fetchSensorData(true);
+          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           addLogEntry(
@@ -2188,8 +2220,9 @@
       async function toggleChannelMXC() {
         const checkbox = document.getElementById("toggleMXC");
         const value = checkbox.checked ? 1 : 0;
+        const resetFlag = document.getElementById("reset-mxc").checked ? 1 : 0;
 
-        const command = `set_channel_mxc:${value}`;
+        const command = `set_channel_mxc:${value}:${resetFlag}`;
 
         try {
           addLogEntry(`Sending MXC command: ${command}`, "sent");
@@ -2200,6 +2233,9 @@
             `Channel MXC is now ${checkbox.checked ? "enabled" : "disabled"}`
           );
           console.log(response);
+          if (value === 1 && resetFlag === 1) {
+            fetchSensorData(true);
+          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           addLogEntry(
@@ -2213,13 +2249,18 @@
       async function toggleChannelSTILL() {
         const checkbox = document.getElementById("toggleSTILL");
         const value = checkbox.checked ? 1 : 0;
-
-        const command = `set_channel_still:${value}`;
+        const resetFlag = document.getElementById("reset-still").checked
+          ? 1
+          : 0;
+        const command = `set_channel_still:${value}:${resetFlag}`;
 
         try {
           addLogEntry(`Sending STILL command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
+          if (value === 1 && resetFlag === 1) {
+            fetchSensorData(true);
+          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           addLogEntry(
@@ -2232,13 +2273,17 @@
       async function toggleChannel4k() {
         const checkbox = document.getElementById("toggle4k");
         const value = checkbox.checked ? 1 : 0;
+        const resetFlag = document.getElementById("reset-4k").checked ? 1 : 0;
 
-        const command = `set_channel_4k:${value}`;
+        const command = `set_channel_4k:${value}:${resetFlag}`;
 
         try {
           addLogEntry(`Sending 4k command: ${command}`, "sent");
           const response = await sendCommandToServer(command);
           addLogEntry(`Server response: ${response}`, "received");
+          if (value === 1 && resetFlag === 1) {
+            fetchSensorData(true);
+          }
         } catch (error) {
           checkbox.checked = !checkbox.checked;
           addLogEntry(
